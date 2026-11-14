@@ -145,6 +145,22 @@ def exact_next_operation(ws: Workspace) -> dict:
             if g["state"].startswith("AWAITING"):
                 return {"kind": "AWAIT_HUMAN_REVIEW", "run_id": g["run_id"], "state": g["state"],
                         "command": f"vme review serve --run {g['run_id']}"}
+        pending = []
+        lock_p = ws.state_dir / "SOURCE_LOCK.json"
+        if lock_p.exists():
+            lock = read_json(lock_p)
+            unconfirmed = [s["file_name"] for s in lock.get("sources", []) if str(s.get("basis", "")).startswith("PROPOSED")]
+            if unconfirmed:
+                pending.append(f"confirm source roles by SHA256 in config/source_roles.json (proposed: {unconfirmed})")
+        six_p = ws.state_dir / "SIXTH_LOCATOR_STATUS.json"
+        if six_p.exists() and read_json(six_p).get("status") != "LOCKED":
+            pending.append("lock the sixth volcano→logo interval from the local witness packet (vme selection sixth-lock ...)")
+        stopped = [t for t in st.list("LoopTransition") if t["status"] == "STOPPED"]
+        for t in stopped:
+            pending.append(f"loop {t['run_id']} stopped at {t['stage']}: {t.get('stop_reason')}")
+        if pending:
+            return {"kind": "AWAIT_HUMAN_DECISIONS", "pending": pending,
+                    "command": "vme status --detailed   # then the user decides; no paid work without vme authorize"}
         return {"kind": "NONE_PENDING", "command": "vme status --detailed"}
     finally:
         st.close()

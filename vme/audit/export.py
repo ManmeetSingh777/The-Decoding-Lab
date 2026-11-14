@@ -504,9 +504,17 @@ def build_audit_zip(out_zip: Path, *, workspace: Workspace) -> dict:
                 continue
             keep = (wrel.startswith("frames/") and (wrel.endswith("index.jsonl.gz") or wrel.endswith("index_summary.json") or wrel.endswith("film_survey.json")
                                                      or wrel.endswith("navigation_candidates.json"))) or \
-                   wrel in ("state/SOURCE_LOCK.json", "state/FRAME_INDEX_SUMMARY.json", "state/STATE.json")
+                   wrel in ("state/SOURCE_LOCK.json", "state/FRAME_INDEX_SUMMARY.json", "state/STATE.json", "state/CONTINUE_HERE.md",
+                            "state/SIXTH_LOCATOR_STATUS.json")
             if keep:
                 add(wp, "visual-mastery-engine/workspace/" + wrel)
+        st_real = workspace.store()
+        try:
+            snap = build / "real_store_snapshot.sqlite"
+            st_real.snapshot_to(snap)          # coherent backup-API copy (metadata only: no pixels, no secrets)
+        finally:
+            st_real.close()
+        add(snap, "visual-mastery-engine/workspace/store/vme.sqlite")
         spec_files = [p for p in sorted(SPEC.rglob("*")) if p.is_file() and p.suffix.lower() != ".zip" and "__pycache__" not in p.parts]
         for p in spec_files:
             add(p, "Visual_Mastery_Engine_Build_Spec_v1_3/" + p.relative_to(SPEC).as_posix())
