@@ -36,6 +36,11 @@ def e2e(tmp_path_factory):
 @pytest.mark.req("ADD26-A01", "ADD26-S0S9", "ADD24-E2", "C13")
 def test_e2e_all_stages_real_consumers(e2e):
     root, out = e2e
+    from vme.render.renderer import REMOTION_DIR
+    if not (REMOTION_DIR / "node_modules" / "remotion").exists():
+        # truthful stop when the render engine is absent (e.g. fresh ZIP extraction before `npm ci`)
+        assert out.get("stopped_at") == "S8" and out.get("reason") == "RENDER_ENGINE_NOT_INSTALLED", out
+        pytest.skip("Remotion not installed: loop stopped truthfully at S8 (run `npm ci` in render/remotion)")
     assert out.get("completed_through") == "S9", out
     from vme.state.workspace import Workspace
     st = Workspace(root).ensure().store()

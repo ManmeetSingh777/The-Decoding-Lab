@@ -114,6 +114,8 @@ def test_real_frame_retrieval_identity_spot_check():
         pytest.skip("real workspace not ingested")
     lock = json.loads(lock_p.read_text(encoding="utf-8"))
     s = next(x for x in lock["sources"] if x["role"] == "SIXTH_SPECIAL")
+    if not (Path(lock["folder"]) / s["relative_path"]).exists():
+        pytest.skip("source MP4s are not distributed with the audit ZIP; place them to run this check")
     idx = read_index(REAL_WS / "frames" / s["sha256"] / "index.jsonl.gz")
     for k in (0, 1234, len(idx) - 1):
         fr = retrieve_frame(Path(lock["folder"]) / s["relative_path"], idx[k])
