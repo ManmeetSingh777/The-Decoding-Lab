@@ -1,0 +1,16 @@
+{
+  "name": "vme-remotion-renderer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "VME primary renderer: renders typed SceneGraph JSON with approved raster assets (Remotion + FFmpeg).",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.538",
+    "@remotion/renderer": "4.0.538",
+    "remotion": "4.0.538",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
