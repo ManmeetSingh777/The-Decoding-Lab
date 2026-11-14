@@ -7,8 +7,14 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from ..util import sha256_bytes, atomic_write_json
-from .synthetic import *  # noqa: F401,F403
-from .synthetic import SYN, OBSERVED_RELATIONS, synthetic_witnesses, synthetic_brief
+from .synthetic import (SYN, OBSERVED_RELATIONS, SKILL_ID, synthetic_witnesses, synthetic_brief, synthetic_decisions,
+                        build_synthetic_skill, make_clip, make_sixth_clip, colour_classifier_factory, fixture_caps)
+
+__all__ = ["SYN", "OBSERVED_RELATIONS", "SKILL_ID", "synthetic_witnesses", "synthetic_brief", "synthetic_decisions",
+           "build_synthetic_skill", "make_clip", "make_sixth_clip", "colour_classifier_factory", "fixture_caps",
+           "FIXTURE_REVIEWER", "SYNTHETIC_BASE_FILMS", "index_and_loader", "synthetic_candidates", "synthetic_bundle", "synthetic_gaps",
+           "synthetic_problem", "fixture_answer", "face_view_proposal_from_answer", "complete_ledger_and_scope", "synthetic_shot_actions",
+           "fixture_layer_pack", "fixture_scene_from_pack", "holdout_brief", "synthetic_output_review"]
 
 FIXTURE_REVIEWER = "TEST_FIXTURE_HUMAN_SIMULATION"
 SYNTHETIC_BASE_FILMS = [f"SYNTHETIC_BASE_FILM_{i}_" + str(i) * 42 for i in range(1, 6)]

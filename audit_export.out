@@ -1,0 +1,22 @@
+{
+  "files": 227,
+  "pytest_outcomes": {
+    "passed": 168
+  },
+  "requirement_totals": {
+    "BLOCKED": 37,
+    "NOT_BUILT": 2,
+    "PASS": 190
+  },
+  "sha256": "134e4b7df801bf13d67231e2edc1e70f59530c9b7f7258d8449732ac710f284d",
+  "zip": "G:\\The Decoding Lab\\VME_V13_IMPLEMENTATION_AUDIT.zip",
+  "zip_self_check": {
+    "decoded_source_frames": [],
+    "media_files": [],
+    "ok": false,
+    "required_present": true,
+    "secret_hits": [
+      "visual-mastery-engine/tests/test_loop_handoff.py"
+    ]
+  }
+}

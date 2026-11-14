@@ -221,3 +221,22 @@ def test_duplicate_frame_identity_distinct_presentation_indices(tmp_path):
     idx, _ = index_and_loader(c, tmp_path / "i")
     assert len({r["frame_content_sha256"] for r in idx}) == 1  # identical pixels
     assert [r["presentation_index"] for r in idx] == list(range(6))  # but distinct verified source frames
+
+
+@pytest.mark.req("ADD25-F02", "A61")
+def test_frame_not_supplied_as_its_actual_image_cannot_advance(store, ws, indexed24):
+    """Frame 10's real pixels are swapped for frame 9's bytes: the packet must not be submitted or committed."""
+    from vme.vision.runner import coverage_for_range
+    clip, idx, loader = indexed24
+
+    def lying_loader(rec):
+        if rec["presentation_index"] == 10:
+            return loader(idx[9])          # wrong image for frame 10
+        return loader(rec)
+    pr, plans, prov = _runner(store, ws, (clip, idx, lying_loader))
+    p = next(p for p in plans if 10 in p.target_indices)
+    with pytest.raises(Blocked) as e:
+        pr.run(p)
+    assert e.value.code == "INPUT_FRAME_IDENTITY_MISMATCH" and prov.billed_count() == 0
+    cov = coverage_for_range(store, idx[0]["film_sha256"], "p_correct", 10, 10)
+    assert cov["verified"] == 0

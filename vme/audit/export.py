@@ -18,7 +18,7 @@ from pathlib import Path
 
 from ..util import Blocked, atomic_write_json, atomic_write_text, digest, now_iso, read_json, sha256_bytes, sha256_file
 from ..state.workspace import Workspace
-from .requirements import all_requirements, ORIGINAL_13
+from .requirements import all_requirements
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = ROOT.parent / "Visual_Mastery_Engine_Build_Spec_v1_3"
@@ -139,7 +139,6 @@ def generate_traces(out: Path, real_ws: Workspace) -> dict:
     from ..style.coverage import review_visual_model_completeness
     from ..style.provenance import interface_two_audit, interface_three_attribution
     from ..skills.operators import registered
-    from ..skills.skill import freeze_skill, skill_hash
     from ..selection.first15 import propose_selection
     from ..vision.runner import plan_packets
     from ..state.handoff import export_handoff, import_handoff, exact_next_operation
@@ -172,8 +171,8 @@ def generate_traces(out: Path, real_ws: Workspace) -> dict:
                           AuthorizationRegistry(tmp / "authz"))
     attempts = []
     for label, fn in [
-        ("raw positivePrompt dict to gateway", lambda: g.submit({"positivePrompt": "draw a cute Kurzgesagt scientist"})),
-        ("append 'add shiny Pixar-style lighting' after compile", lambda: (job.logical_payload.__setitem__("positivePrompt", job.logical_payload["positivePrompt"] + "\nadd shiny Pixar-style lighting"), g.submit(job))),
+        ("raw positivePrompt dict to gateway", lambda: g.submit({"positivePrompt": "draw a cute Kurzgesagt scientist"})),  # type: ignore[arg-type]
+        ("append 'add shiny Pixar-style lighting' after compile", lambda: _append_and_submit(g, job, "\nadd shiny Pixar-style lighting")),
         ("construct CompiledImageJob directly", lambda: CompiledImageJob("x", {}, (), {}, {}, False, False, "0", object())),
         ("style words in brief", lambda: c.compile(fx.synthetic_brief(slots={"subject": "explorer with thick outlines and yellow highlights"}), folder,
                                                    pinned_skill_hash=h, recipe_id="character_world", node_id="n1_scene", caps=caps)),
@@ -224,7 +223,7 @@ def generate_traces(out: Path, real_ws: Workspace) -> dict:
     W("STYLE_TO_COMPILED_IMAGE_JOB_TRACE.json", {"label": "SYNTHETIC", "jobs": [j for j in st.list("CompiledImageJob")], "mutations": mutations,
                                                   "bypass_attempts": attempts})
     # ---- construction / question / decision traces --------------------------------------------------
-    qtrace = st.get("QuestionDerivationTrace", "AUDIT-SYN-E2E")
+    qtrace = st.get("QuestionDerivationTrace", "AUDIT-SYN-E2E") or {}
     d3 = [d for d in st.list("ConditionalVisualDecision")]
     W("CONSTRUCTION_TRACE.json", {"label": "SYNTHETIC fixture evidence — not a film observation",
                                   "witnesses": fx.synthetic_witnesses(), "observed_relations": fx.OBSERVED_RELATIONS,
@@ -232,7 +231,7 @@ def generate_traces(out: Path, real_ws: Workspace) -> dict:
                                   "compiled_prompt": job.logical_payload["positivePrompt"], "skill_hash": h})
     W("QUESTION_REFINEMENT_TRACE.json", {"label": "SYNTHETIC", "initial_problem": fx.synthetic_problem(), "derived_questions": qtrace,
                                          "note": "Q0–Q7 appear as reasoning_dimensions inside each NextQuestion, never as emitted questions"})
-    tr = st.get("TransferRecord", "AUDIT-SYN-E2E")
+    tr = st.get("TransferRecord", "AUDIT-SYN-E2E") or {}
     W("ADD26_QUESTION_DERIVATION_TRACE.json", {"label": "SYNTHETIC", "evidence_to_questions": qtrace,
                                                "after_changed_output": {"review": fx.synthetic_output_review(tr["output_sha"]), "next_question": tr["next_question"],
                                                                         "previous_question_text": tr["previous_question_text"], "changed": tr["question_changed"]},
@@ -242,7 +241,7 @@ def generate_traces(out: Path, real_ws: Workspace) -> dict:
                                                "substitution_challenge": d3[0]["substitution_challenge"] if d3 else None})
     W("CHARACTER_STYLE_WITNESS_DEMO.json", {"label": "SYNTHETIC", "cross_actor_group": __import__("vme.artwork.character", fromlist=["x"]).cross_actor_witness_group(
         list(fx.synthetic_witnesses().values()), "new actor three-quarter reach"), "witnesses": fx.synthetic_witnesses()})
-    plan = st.get("CharacterConstructionPlan", "AUDIT-SYN-E2E:explorer")
+    plan = st.get("CharacterConstructionPlan", "AUDIT-SYN-E2E:explorer") or {}
     W("CHARACTER_STYLE_SKILL_TRACE.json", {"label": "SYNTHETIC", "C1_witness": "W-SYN-A01..A03,B01", "C3_relation": fx.OBSERVED_RELATIONS["R-SYN-02"],
                                            "C4_decision": d3, "C5_recipe_nodes": rj(folder / "recipes" / "character_world.json")["nodes"],
                                            "C6_compiled_pose_jobs": [j for j in st.list("CompiledImageJob") if j["trace"]["node_id"] in ("n3_view", "n4_grip")],
@@ -298,6 +297,11 @@ def generate_traces(out: Path, real_ws: Workspace) -> dict:
     return written
 
 
+def _append_and_submit(g, job, text: str):
+    job.logical_payload["positivePrompt"] += text    # simulates a runtime LLM appending style text after compilation
+    return g.submit(job)
+
+
 def _lost_clause(c, brief, folder, h, caps):
     from ..compiler.compiler import StyleProgramCompiler
     def buggy(t, s):
@@ -339,7 +343,7 @@ def _asset_roundtrip(tmp: Path, pack: dict) -> dict:
 
 
 def _neg27(fx, registered):
-    from ..style.coverage import review_visual_model_completeness, OriginalScope, set_dimension, new_ledger, DIMENSIONS
+    from ..style.coverage import review_visual_model_completeness, set_dimension, new_ledger, DIMENSIONS
     out = {}
     def rv(name, decs, ledger_mut=None, scope=None, **kw):
         L, sc = fx.complete_ledger_and_scope()
@@ -494,15 +498,15 @@ def build_audit_zip(out_zip: Path, *, workspace: Workspace) -> dict:
                 add(p, "visual-mastery-engine/audit/" + p.relative_to(audit).as_posix())
         # real-source evidence: hashes/PTS indexes and surveys only — NEVER decoded source pixels or MP4 bytes
         wr = workspace.root
-        for p in sorted(wr.rglob("*")):
-            rel = p.relative_to(wr).as_posix()
-            if not p.is_file():
+        for wp in sorted(wr.rglob("*")):
+            wrel = wp.relative_to(wr).as_posix()
+            if not wp.is_file():
                 continue
-            keep = (rel.startswith("frames/") and (rel.endswith("index.jsonl.gz") or rel.endswith("index_summary.json") or rel.endswith("film_survey.json")
-                                                     or rel.endswith("navigation_candidates.json"))) or \
-                   rel in ("state/SOURCE_LOCK.json", "state/FRAME_INDEX_SUMMARY.json", "state/STATE.json")
+            keep = (wrel.startswith("frames/") and (wrel.endswith("index.jsonl.gz") or wrel.endswith("index_summary.json") or wrel.endswith("film_survey.json")
+                                                     or wrel.endswith("navigation_candidates.json"))) or \
+                   wrel in ("state/SOURCE_LOCK.json", "state/FRAME_INDEX_SUMMARY.json", "state/STATE.json")
             if keep:
-                add(p, "visual-mastery-engine/workspace/" + rel)
+                add(wp, "visual-mastery-engine/workspace/" + wrel)
         spec_files = [p for p in sorted(SPEC.rglob("*")) if p.is_file() and p.suffix.lower() != ".zip" and "__pycache__" not in p.parts]
         for p in spec_files:
             add(p, "Visual_Mastery_Engine_Build_Spec_v1_3/" + p.relative_to(SPEC).as_posix())

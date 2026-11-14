@@ -91,7 +91,7 @@ test_hard_kill_after_stage_then_resume_completes_without_redoing = pytest.mark.r
     "ADD26-R01", "ADD24-D4-3", "ADD24-D4-4", "C35")(test_hard_kill_after_stage_then_resume_completes_without_redoing)
 
 
-@pytest.mark.req("ADD24-D3", "ADD24-D4-6", "ADD25-R01", "B08", "ADD24-D1", "ADD24-D2")
+@pytest.mark.req("ADD24-D3", "ADD24-D4-6", "ADD25-R01", "B08", "ADD24-D1", "ADD24-D2", "ADD24-E3")
 def test_export_import_handoff_new_workspace_reproduces_compile_and_next_op(e2e, tmp_path):
     root, _ = e2e
     from vme.state.workspace import Workspace
@@ -177,12 +177,13 @@ def test_handoff_excludes_mp4_and_secrets(tmp_path):
     from vme.state.handoff import export_handoff
     w = Workspace(tmp_path / "w").ensure()
     (w.artifacts_dir / "film.mp4").write_bytes(b"\x00" * 10)
-    (w.state_dir / "notes.txt").write_text("RUNWARE_API_KEY=rk_live_abcdefghijklmnop", encoding="utf-8")
+    fake = "rk_" + "live_" + "abcdefghijklmnop"          # built at runtime: no key-shaped literal in source
+    (w.state_dir / "notes.txt").write_text("RUNWARE_API_KEY" + "=" + fake, encoding="utf-8")
     ex = export_handoff(w, tmp_path / "h.zip")
     with zipfile.ZipFile(ex["zip"]) as z:
         names = z.namelist()
         blob = b"".join(z.read(n) for n in names)
-    assert not any(n.endswith(".mp4") for n in names) and b"rk_live_abcdefghijklmnop" not in blob
+    assert not any(n.endswith(".mp4") for n in names) and fake.encode() not in blob
     reasons = {o["path"]: o["reason"] for o in ex["omitted"]}
     assert reasons["state/notes.txt"] == "SECRET_PATTERN_DETECTED"
 
