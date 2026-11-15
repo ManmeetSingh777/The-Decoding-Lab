@@ -27,9 +27,13 @@ class DecisionBranch:
     reference_role_ids: list
     operation_node_ids: list
     priority: int = 100
+    mandatory_reference_role_ids: list | None = None   # None = legacy (all roles mandatory)
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if d["mandatory_reference_role_ids"] is None:
+            d.pop("mandatory_reference_role_ids")
+        return d
 
 
 @dataclass

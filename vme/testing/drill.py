@@ -72,7 +72,11 @@ def build_drill_workspace(root: Path) -> dict:
     reg.issue(provider="anthropic-claude", model_id="claude-opus-5-5", task_categories=["source_vision", "capability_probe"], spend_cap_usd=500.0,
               issued_by=DRILL_HUMAN, confirm_phrase=CONFIRM_PHRASE, source_upload_consent=True, allowed_source_shas=shas, note="DRILL — simulated transport")
     reg.issue(provider="runware", model_id="runware:400@4", task_categories=["image_generation", "capability_probe"], spend_cap_usd=5.0,
-              issued_by=DRILL_HUMAN, confirm_phrase=CONFIRM_PHRASE, note="DRILL — simulated transport")
+              issued_by=DRILL_HUMAN, confirm_phrase=CONFIRM_PHRASE, source_upload_consent=True, allowed_source_shas=shas,
+              note="DRILL — simulated transport; exemplar references from synthetic drill films")
+    from ..loop.human import consent_reference_exemplars
+    for sha in shas:
+        consent_reference_exemplars(ws, film_sha=sha, by=DRILL_HUMAN, statement="DRILL — synthetic films generated locally")
     add_brief(ws, drill_brief(), added_by=DRILL_HUMAN)
     return {"ws": ws, "sources": src}
 
@@ -88,7 +92,7 @@ def drill_providers(root: Path, *, vision_mode: str = "ok", image_mode: str = "o
 
 def drill_config():
     from ..loop.real import RealLoopConfig
-    return RealLoopConfig(max_window_s=0.34, min_window_s=0.2, max_windows_per_film=3, target_per_packet=8, native_followups_per_sequence=1,
+    return RealLoopConfig(max_window_s=0.34, min_window_s=0.2, max_windows_per_film=3, target_per_packet=8, native_followup_budget=400,
                           max_questions=80, render={"width": 320, "height": 180, "fps": 30})
 
 

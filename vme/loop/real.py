@@ -30,7 +30,7 @@ CONSUMERS = {
     "S8": "RealLoopRunner._s8 → render.renderer:render_video (GateKeeper.authorize_render)",
     "S9": "RealLoopRunner._s9 → human video review → freeze check → HoldoutRegistry → runtime.execute → controller.observe_new_output",
 }
-OP_FOR_KIND = {"whole_scene": "op.whole_scene", "canonical_character": "op.canonical_character", "layer_extract": "op.layer_extract",
+OP_FOR_KIND = {"whole_scene": "op.whole_scene", "world_plate": "op.world_plate", "canonical_character": "op.canonical_character", "layer_extract": "op.layer_extract",
                "motion_render": "op.motion_render"}
 RATIONALE_SYSTEM = """SOURCE ANALYSIS ONLY. You see 3 actual frames (start, middle, end) of one contiguous window of a source film.
 Return strict JSON: {"whole_visual_quality_statement": str (a specific visible relationship between designed forms, world, light or motion;
@@ -58,9 +58,10 @@ the neighbouring frames. Describe only what the crop shows in relation to the wh
 class RealLoopConfig:
     max_window_s: float = 12.0
     min_window_s: float = 2.0
-    max_windows_per_film: int = 10
+    max_windows_per_film: int = 10          # INITIAL rationale batch per film; expanded when selection cannot be filled (R22)
     target_per_packet: int = 8
-    native_followups_per_sequence: int = 3
+    native_followup_budget: int = 400       # total model-requested native crops per run (budget, not a per-sequence cap) (R11)
+    reinspection_budget: int = 40           # gap-driven source reinspection requests per run (R11)
     max_questions: int = 60
     max_attempts_per_gap: int = 2
     render: dict = field(default_factory=lambda: {"width": 1280, "height": 720, "fps": 30})
@@ -168,6 +169,7 @@ class RealLoopRunner:
 
     # ---- S0: source roles, windows, VLM rationales, selection, human approval ----------------------------
     def _windows(self, idx: list[dict], survey: dict) -> list[tuple[int, int]]:
+        """ALL candidate windows of a film (no convenience cap); the review ORDER spreads the first batch evenly."""
         fps = 1.0 / max(1e-6, (idx[-1]["pts_time"] - idx[0]["pts_time"]) / max(1, len(idx) - 1))
         mx, mn = int(self.cfg.max_window_s * fps), int(self.cfg.min_window_s * fps)
         out = []
@@ -178,14 +180,20 @@ class RealLoopRunner:
                 if e - a + 1 >= mn:
                     out.append((a, e))
                 a = e + 1
-        if len(out) > self.cfg.max_windows_per_film:
-            step = len(out) / self.cfg.max_windows_per_film
-            out = [out[int(i * step)] for i in range(self.cfg.max_windows_per_film)]
         return out
+
+    @staticmethod
+    def _review_order(n: int, first: int) -> list[int]:
+        """Evenly spread first batch, then the remaining windows in stride order (deterministic expansion)."""
+        if n <= 0:
+            return []
+        step = max(1.0, n / max(1, first))
+        head = sorted({int(i * step) for i in range(min(first, n))})
+        return head + [i for i in range(n) if i not in set(head)]
 
     def _s0(self, st):
         from ..reference.roles import role_status
-        from ..selection.first15 import propose_selection, validate_candidate
+        from ..selection.first15 import propose_selection
         rs = role_status(self.ws)
         if not rs["base_five_confirmed"]:
             return "STOPPED", {"stop_reason": "SOURCE_ROLES_UNCONFIRMED", "unconfirmed": rs["unconfirmed"], "resolutions": rs["resolutions"]}
@@ -193,15 +201,52 @@ class RealLoopRunner:
         base = [s["sha256"] for s in lock["sources"] if s["role"] == "BASE_FILM"]
         vis = self._vision()
         made, rejected = 0, []
-        for sha in base:
-            sv = st.get("FilmSurvey", sha)
-            if not sv:
-                raise Blocked("NO_SURVEY", sha[:12])
-            src, idx, cache = self._film(sha)
-            for (a, b) in self._windows(idx, sv):
+        batches = 0
+        cov_ledger: dict = {}
+        while True:
+            batches += 1
+            new_this_batch = 0
+            for sha in base:
+                new_this_batch += self._rationale_batch(st, vis, sha, batches, cov_ledger, rejected)
+            made += new_this_batch
+            cands = [c for c in st.list("CandidateSequence") if c.get("observer") == "VLM" and c["film_sha"] in base]
+            lens = {sha: len(self._film(sha)[1]) for sha in base}
+            man = propose_selection(cands, base, index_lengths=lens)
+            unreviewed = sum(v["unreviewed"] for v in cov_ledger.values())
+            if man["status"] == "PROPOSED_AWAITING_USER_REVIEW" or not unreviewed or new_this_batch == 0:
+                break
+        st.put("CandidateCoverageLedger", self.run_id, {"films": cov_ledger, "expansion_batches": batches,
+                                                        "note": "candidates expand batch by batch until the 3-per-film selection "
+                                                                "can be filled or every window is reviewed (R22)"})
+        st.put("SelectedSequenceManifest", "REAL:15", man)
+        out = {"candidates": len(cands), "new_rationales": made, "selection_status": man["status"], "selected": man.get("selected_count"),
+               "manifest_sha": man.get("manifest_sha"), "rejected": len(man.get("rejected", [])), "expansion_batches": batches,
+               "unreviewed_windows": unreviewed}
+        if man["status"] != "PROPOSED_AWAITING_USER_REVIEW":
+            return "STOPPED", {**out, "stop_reason": "SELECTION_INCOMPLETE"}
+        if not st.get("SelectionApproval", man["manifest_sha"]):
+            return "STOPPED", {**out, "stop_reason": "AWAITING_SELECTION_APPROVAL",
+                               "human_next_step": f"vme selection approve --manifest-sha {man['manifest_sha']} --by <name>"}
+        six = st.get("SpecialIntroSelection", "REAL")
+        if not six or six.get("status") != "LOCKED":     # R13: the 15+1 study cannot start without the sixteenth interval
+            return "STOPPED", {**out, "sixth": "PENDING_HUMAN_BOUNDARY_LOCK", "stop_reason": "SIXTH_BOUNDARY_NOT_LOCKED",
+                               "human_next_step": "view the sixth-clip witness frames, then `vme sixth lock --start <i> --end <j> --by <name>`"}
+        out["sixth"] = "LOCKED"
+        return "COMPLETED", out
+
+    def _rationale_batch(self, st, vis, sha: str, batch: int, cov_ledger: dict, rejected: list) -> int:
+        from ..selection.first15 import validate_candidate
+        sv = st.get("FilmSurvey", sha)
+        if not sv:
+            raise Blocked("NO_SURVEY", sha[:12])
+        src, idx, cache = self._film(sha)
+        wins = self._windows(idx, sv)
+        order = self._review_order(len(wins), self.cfg.max_windows_per_film)
+        todo = [wins[i] for i in order if not st.get("CandidateSequence", f"win_{sha[:10]}_{wins[i][0]}_{wins[i][1]}")]
+        made = 0
+        for (a, b) in todo[: self.cfg.max_windows_per_film]:
+            if True:
                 cid = f"win_{sha[:10]}_{a}_{b}"
-                if st.get("CandidateSequence", cid):
-                    continue
                 keys = [a, (a + b) // 2, b]
                 imgs = [(f"FRAME {sha[:16]}:{k} pts_time={idx[k]['pts_time']:.6f}", cache(idx[k])["png"], src["width"], src["height"]) for k in keys]
                 tid = custom_id_for("window_rationale", {"source_sha": sha, "window": [a, b], "frames": [idx[k]["frame_content_sha256"] for k in keys],
@@ -221,20 +266,10 @@ class RealLoopRunner:
                     rejected.append({"candidate_id": cid, "reasons": why})
                 st.put("CandidateSequence", cid, cand)
                 made += 1
-        cands = [c for c in st.list("CandidateSequence") if c.get("observer") == "VLM" and c["film_sha"] in base]
-        lens = {sha: len(self._film(sha)[1]) for sha in base}
-        man = propose_selection(cands, base, index_lengths=lens)
-        st.put("SelectedSequenceManifest", "REAL:15", man)
-        out = {"candidates": len(cands), "new_rationales": made, "selection_status": man["status"], "selected": man.get("selected_count"),
-               "manifest_sha": man.get("manifest_sha"), "rejected": len(man.get("rejected", []))}
-        if man["status"] != "PROPOSED_AWAITING_USER_REVIEW":
-            return "STOPPED", {**out, "stop_reason": "SELECTION_INCOMPLETE"}
-        if not st.get("SelectionApproval", man["manifest_sha"]):
-            return "STOPPED", {**out, "stop_reason": "AWAITING_SELECTION_APPROVAL",
-                               "human_next_step": f"vme selection approve --manifest-sha {man['manifest_sha']} --by <name>"}
-        six = st.get("SpecialIntroSelection", "REAL")
-        out["sixth"] = "LOCKED" if six and six.get("status") == "LOCKED" else "PENDING_HUMAN_BOUNDARY_LOCK"
-        return "COMPLETED", out
+        reviewed = sum(1 for (a, b) in wins if st.get("CandidateSequence", f"win_{sha[:10]}_{a}_{b}"))
+        cov_ledger[sha] = {"windows_total": len(wins), "reviewed": reviewed, "unreviewed": len(wins) - reviewed,
+                           "unreviewed_status": "UNREVIEWED_CANDIDATES_NOT_CLAIMED_ABSENT"}
+        return made
 
     # ---- S1: every frame of the selected windows, witnesses, native-detail follow-ups ------------------
     def _s1(self, st):
@@ -243,11 +278,13 @@ class RealLoopRunner:
         man = st.get("SelectedSequenceManifest", "REAL:15")
         intervals = [(s["film_sha"], s["start_frame_index"], s["end_frame_index_inclusive"], s["candidate_id"]) for s in man["selected"]]
         six = st.get("SpecialIntroSelection", "REAL")
-        if six and six.get("status") == "LOCKED":
-            intervals.append((six["clip_sha256"], six["start_frame_index"], six["end_frame_index_inclusive"], "SIXTH"))
+        if not six or six.get("status") != "LOCKED":
+            return "STOPPED", {"stop_reason": "SIXTH_BOUNDARY_NOT_LOCKED", "note": "the initial 15+1 study never runs as 15 (R13)"}
+        intervals.append((six["clip_sha256"], six["start_frame_index"], six["end_frame_index_inclusive"], "SIXTH"))
         vis = self._vision()
         pass_id = f"{self.run_id}-L0"
         cov_all, pending, wit, native = {}, [], 0, 0
+        pending_native: list = []
         for film, a, b, seq in intervals:
             src, idx, cache = self._film(film)
             plans = plan_packets(idx, a, b, film_sha=film, pass_id=pass_id, cluster_id=seq, model_version=vis.caps.model_id,
@@ -269,7 +306,11 @@ class RealLoopRunner:
                 obs += [json.loads(l) for l in fp.read_text(encoding="utf-8").splitlines() if l.strip()]
             st.put("CrossFrameEventGraph", f"{self.run_id}:{seq}", build_event_graph(obs))
             wit += self._extract_witnesses(st, film, seq, obs, idx)
-            native += self._native_followups(st, vis, film, seq, obs, idx, cache, src)
+            self._register_phenomena(st, film, seq, obs)
+            nf = self._native_followups(st, vis, film, seq, obs, idx, cache, src)
+            native += nf["done"]
+            if nf["pending"]:
+                pending_native.extend(nf["pending"])
         if pending:
             codes = {s for p in pending for s in p["packets"].values()}
             reason = "BLOCKED_AUTHORIZATION" if "BLOCKED_CONSENT" in codes else "PROVIDER_PENDING_OR_REINSPECTION"
@@ -277,6 +318,10 @@ class RealLoopRunner:
         incomplete = [k for k, v in cov_all.items() if not v["complete"]]
         if incomplete:
             return "STOPPED", {"stop_reason": "SELECTED_RANGE_NOT_FULLY_SEEN", "sequences": incomplete}
+        if pending_native:
+            st.put("PendingNativeFollowups", self.run_id, {"pending": pending_native, "budget": self.cfg.native_followup_budget})
+            return "STOPPED", {"stop_reason": "NATIVE_FOLLOWUP_BUDGET_EXHAUSTED", "pending": len(pending_native),
+                               "exact_next_input": pending_native[0], "human_next_step": "raise the authorized budget or accept the open list"}
         return "COMPLETED", {"sequences": len(intervals), "frames_verified": sum(v["verified"] for v in cov_all.values()),
                              "statuses": sorted({s for v in cov_all.values() for s in v["statuses"]}), "witnesses": wit,
                              "native_followups": native, "sixth_included": any(i[3] == "SIXTH" for i in intervals),
@@ -302,18 +347,26 @@ class RealLoopRunner:
                 n += 1
         return n
 
-    def _native_followups(self, st, vis, film, seq, obs, idx, cache, src) -> int:
+    def _native_budget_used(self, st) -> int:
+        return int((st.get("NativeFollowupBudget", self.run_id) or {}).get("used", 0))
+
+    def _native_followups(self, st, vis, film, seq, obs, idx, cache, src) -> dict:
+        """EVERY model-requested native crop is performed until the authorized run budget is used; the rest are kept as an
+        explicit pending list (exact next input), never silently dropped (R11; no per-sequence cap)."""
         from ..reference.frames import native_crop
-        done = 0
+        done, pending = 0, []
         for o in obs:
             for f in o.get("native_detail_followups") or []:
-                if done >= self.cfg.native_followups_per_sequence or not isinstance(f, dict) or not f.get("region"):
+                if not isinstance(f, dict) or not f.get("region"):
                     continue
                 k = int(str(o["frame_id"]).split(":")[1])
                 r = f["region"]
                 wid = f"W-{film[:10]}-{k}-native-{r['x']}-{r['y']}"
-                if st.get("Witness", wid):
+                if st.get("Witness", wid) or st.get("Witness", f"{wid}-0"):
                     done += 1
+                    continue
+                if self._native_budget_used(st) >= self.cfg.native_followup_budget:
+                    pending.append({"film": film, "frame": k, "region": r, "reason": f.get("reason"), "sequence": seq})
                     continue
                 full = cache.frame(k)
                 crop = native_crop(full, int(r["x"]), int(r["y"]), int(r["w"]), int(r["h"]))
@@ -341,8 +394,30 @@ class RealLoopRunner:
                     c.execute("INSERT OR REPLACE INTO frame_vision(film_sha256,frame_index,pass_id,status,packet_id,image_sha,observation_sha,updated_at) "
                               "VALUES(?,?,?,?,?,?,?,?)", (film, k, f"{self.run_id}-native", "NATIVE_DETAIL_REVIEWED" if self.p.evidence_origin == "REAL_VLM"
                                                           else "SIMULATED_NATIVE_DETAIL", wid, crop.crop_png_sha256, digest(resp), now_iso()))
+                st.put("NativeFollowupBudget", self.run_id, {"used": self._native_budget_used(st) + 1, "budget": self.cfg.native_followup_budget})
                 done += 1
-        return done
+        return {"done": done, "pending": pending}
+
+    def _register_phenomena(self, st, film, seq, obs) -> None:
+        """A28 pass 1/6: salient visual behaviour the vision model could not place in the atlas becomes a VisualPhenomenon
+        that completeness must explain or explicitly leave unresolved (not hidden by a filled category)."""
+        for o in obs:
+            for i, ph in enumerate(o.get("unexplained_phenomena") or []):
+                if not isinstance(ph, dict) or not ph.get("phenomenon"):
+                    continue
+                k = int(str(o["frame_id"]).split(":")[1])
+                dims = sorted(d for d in ph.get("connected_dimensions", []) if isinstance(d, str))
+                pid = "VP-" + digest([" ".join(ph["phenomenon"].lower().split()), dims])[:14]    # same behaviour seen again = same phenomenon
+                prev = st.get("VisualPhenomenon", pid)
+                sighting = {"film_sha256": film, "sequence_id": seq, "frame_index": k, "frame_id": o["frame_id"], "region": ph.get("region")}
+                if prev:
+                    if sighting not in prev["sightings"]:
+                        st.put("VisualPhenomenon", pid, {**prev, "sightings": prev["sightings"] + [sighting]})
+                    continue
+                st.put("VisualPhenomenon", pid, {"phenomenon_id": pid, "phenomenon": ph["phenomenon"], "film_sha256": film, "sequence_id": seq,
+                                                 "frame_index": k, "frame_id": o["frame_id"], "why": ph.get("why", ""),
+                                                 "connected_dimensions": dims, "sightings": [sighting],
+                                                 "region": ph.get("region"), "status": "UNEXPLAINED", "evidence_origin": self.p.evidence_origin})
 
     # ---- S2/S3: multi-gap investigation with evidence-backed answers and decision authoring -------------
     def _ledger(self, st, plan: dict, frame_state: str) -> dict:
@@ -361,18 +436,25 @@ class RealLoopRunner:
                 seen.setdefault(d, []).append({"film_sha256": "", "sequence_id": r["relation_id"], "frame_start": 0, "frame_end": 0})
         ev = lambda ws_: [{"source_hash": w.get("film_sha256") or "RELATION", "sequence_id": w["sequence_id"], "frame_start": w["frame_start"],
                            "frame_end": w["frame_end"], "evidence_kind": "FULL_FRAME"} for w in ws_[:3]]
+        from ..style.coverage import owns
         for d in DIMENSIONS:
             owners = [x for x in decs if d in x.get("dimension_tags", [])]
-            if owners:
+            needing = [c for c in plan["choices"] if d in c["dimensions"]]
+            unowned = [c["choice_id"] for c in needing if not any(owns(x, c["choice_id"], c["dimensions"]) for x in decs)]
+            if owners and unowned and d in seen:
+                set_dimension(L, d, "RELEVANT_UNKNOWN", evidence=ev(seen[d]), why_relevant="some production choices using this dimension are owned, "
+                              "others are not (category presence is not coverage)", missing_decisions=unowned)
+            elif owners:
                 ops = sorted({o for x in owners for b in x["branches"] for o in b["operation_node_ids"]})
-                set_dimension(L, d, "RELEVANT_SUPPORTED", evidence=ev(seen.get(d, [])), why_relevant="evidenced decision exists", production_consumers=ops)
+                set_dimension(L, d, "RELEVANT_SUPPORTED", evidence=ev(seen.get(d, [])), why_relevant="every production choice using it is owned",
+                              production_consumers=ops)
             elif d in seen and d not in plan["required_dimensions"]:
                 set_dimension(L, d, "NOT_APPLICABLE_WITH_REASON", evidence=ev(seen[d]), why_relevant="observed in sources",
                               inapplicability_reason="observed in selected windows but not required by this original scope "
                                                      "(production-decision coverage is scoped; kept as evidence for later scopes)")
             elif d in seen:
                 set_dimension(L, d, "RELEVANT_UNKNOWN", evidence=ev(seen[d]), why_relevant="observed in selected windows; no decision yet",
-                              missing_decisions=[f"decision for {d}"])
+                              missing_decisions=[c["choice_id"] for c in needing] or [f"decision for {d}"])
             elif d in plan["required_dimensions"]:
                 set_dimension(L, d, "PENDING_SOURCE", evidence=[], why_relevant="required by the original scope, not observed in selected windows")
             else:
@@ -380,16 +462,32 @@ class RealLoopRunner:
                               inapplicability_reason="not required by the original scope and not observed")
         for j in plan["joint_choices"]:
             dims = set(j["dimensions"])
-            sup = [w for w in wits if dims <= set(w.get("dimensions", []))] + [r for r in rels if dims <= set(r["dimensions"])]
-            set_relation(L, j["joint_id"], j["dimensions"], "SUPPORTED" if sup else "UNKNOWN", evidence=[],
-                         producing_effect="joint construction must be decided together", missing_decisions=[] if sup else [j["joint_id"]])
+            # R10: a joint relation is SUPPORTED only by actual witnesses that show ALL participating dimensions together
+            wids = sorted({w["witness_id"] for w in wits if dims <= set(w.get("dimensions", []))} |
+                          {x for r in rels if dims <= set(r["dimensions"]) for x in r.get("witness_ids", [])})
+            ev_ = [{"witness_id": x} for x in wids[:12]]
+            set_relation(L, j["joint_id"], j["dimensions"], "SUPPORTED" if wids else "UNKNOWN", evidence=ev_,
+                         producing_effect="joint construction must be decided together", missing_decisions=[] if wids else [j["joint_id"]])
         return L
+
+    def _phenomena_gaps(self, st, plan: dict) -> list[dict]:
+        """Unexplained VisualPhenomenon records relevant to the original scope → explicit gaps (not category checkmarks)."""
+        decs = [d for d in st.list("ConditionalVisualDecision") if not d.get("synthetic") and d.get("status") != "RESEARCH_ONLY"]
+        explained = {p for d in decs for p in d.get("owned_choice_ids", []) if p.startswith("VP-")}
+        out = []
+        for ph in st.list("VisualPhenomenon"):
+            if ph["phenomenon_id"] in explained or ph.get("status") == "SCOPED_OUT_WITH_REASON":
+                continue
+            if not set(ph["connected_dimensions"]) & set(plan["required_dimensions"]):
+                continue
+            out.append(ph)
+        return out
 
     def _s2(self, st):
         from ..style.coverage import OriginalScope, review_visual_model_completeness, reverse_plan, cluster_gaps
         from ..investigation.controller import ActiveArtProblem, LoopController, ProblemContext
         from ..skills.operators import registered
-        from ..style.authoring import author_decision, decision_id_for
+        from ..style.authoring import author_decision, production_choice_id
         s1 = self._out(st, "S1")
         brief = self._brief(st)
         if not brief.get("scope"):
@@ -403,7 +501,21 @@ class RealLoopRunner:
         for _ in range(self.cfg.max_questions):
             L = self._ledger(st, plan, frame_state)
             decs = [d for d in st.list("ConditionalVisualDecision") if not d.get("synthetic")]
+            phen = self._phenomena_gaps(st, plan)
             rev = review_visual_model_completeness(L, scope, decs, registered())
+            for ph in phen:      # unexplained phenomena are gaps of their own, owned by the phenomenon id
+                rev["gap_details"].append({"gap_id": f"GP_{ph['phenomenon_id']}", "kind": "MISSING_DECISION", "salience": "HIGH",
+                                           "what": f"unexplained phenomenon {ph['phenomenon']!r} at {ph['frame_id']}",
+                                           "dimensions": sorted(set(ph["connected_dimensions"]) & set(plan["required_dimensions"])),
+                                           "choice_id": ph["phenomenon_id"], "phenomenon_id": ph["phenomenon_id"],
+                                           "conditions": {}})
+            if phen:
+                from ..style.coverage import choose_controlling_gap
+                rev["controlling_gap"] = choose_controlling_gap(rev["gap_details"])
+                rev["review"]["image_trial_ready"] = False
+                rev["review"]["state"] = "BLOCKED_MISSING_STYLE_DECISION" if rev["review"]["state"] == "READY_FOR_ORIGINAL_IMAGE_TRIAL" \
+                    else rev["review"]["state"]
+                rev["review"]["gaps"] = rev["review"]["gaps"] + [g["gap_id"] for g in rev["gap_details"] if g["gap_id"].startswith("GP_")]
             st.put("CoverageReview", self.run_id, rev)
             st.put("VisualModelCoverageLedger", self.run_id, L)
             if rev["review"]["image_trial_ready"]:
@@ -413,19 +525,49 @@ class RealLoopRunner:
                                      "resolved_gaps": sorted({s["gap_signature"] for s in trace["steps"] if s.get("decision_changed")})}
             g = rev["controlling_gap"]
             sig = f"{g['kind']}|{'+'.join(g['dimensions'])}|{g.get('joint_id') or g.get('choice_id')}"
-            if g["kind"] in ("MISSING_SOURCE", "CONTRADICTED", "MISSING_OPERATION", "PROMPT_AUTHORITY"):
+            st.put("GapQueue", self.run_id, {"controlling_gap": g, "queued": [x for x in rev["gap_details"] if x["gap_id"] != g["gap_id"]],
+                                             "clusters": rev.get("clusters"), "at": now_iso()})
+            if g["kind"] in ("MISSING_OPERATION", "PROMPT_AUTHORITY") or (g["kind"] == "MISSING_SOURCE" and g.get("source_scope") == "frames"):
+                # engineering / frame-coverage faults route to engineering, not to a new source-art question (A28 P3)
                 st.put("RealInvestigationTrace", self.run_id, trace)
                 return "STOPPED", {"stop_reason": f"BLOCKER_{g['kind']}", "gap": g, "ticket": rev["question_ticket"], "questions": len(trace["steps"])}
+            if g["kind"] in ("MISSING_SOURCE", "CONTRADICTED"):
+                attempts[sig] = attempts.get(sig, 0) + 1
+                r = self._reinspect(st, vis, g, attempts[sig], trace)
+                st.put("RealInvestigationTrace", self.run_id, trace)
+                if r["status"] != "NEW_WITNESSES":
+                    return "STOPPED", {"stop_reason": "SOURCE_UNKNOWN_REMAINS_UNRESOLVED" if r["status"] == "NO_NEW_EVIDENCE" else r["status"],
+                                       "gap": g, "reinspection": r, "questions": len(trace["steps"])}
+                continue
             attempts[sig] = attempts.get(sig, 0) + 1
             if attempts[sig] > self.cfg.max_attempts_per_gap * 3:
                 st.put("RealInvestigationTrace", self.run_id, trace)
                 return "STOPPED", {"stop_reason": "GAP_NOT_CLOSED_BY_EVIDENCE", "gap": g, "questions": len(trace["steps"])}
             comp = next((c for c in cluster_gaps(rev["gap_details"]) if g["gap_id"] in c), [g["gap_id"]])
             cl = [x for x in rev["gap_details"] if x["gap_id"] in comp]
+            if g["kind"] == "MISSING_DECISION" and not (g.get("choice_id") or g.get("joint_id") or g.get("phenomenon_id")):
+                from ..style.coverage import owns
+                cands_ = [c for c in plan["choices"] if set(g["dimensions"]) & set(c["dimensions"])
+                          and not any(owns(d_, c["choice_id"], c["dimensions"]) for d_ in decs)]
+                if cands_:
+                    c0 = cands_[0]
+                    g = {**g, "choice_id": c0["choice_id"], "dimensions": sorted(c0["dimensions"]), "conditions": c0["conditions"],
+                         "mapped_from_dimension_gap": g["gap_id"]}
             dims = sorted(set(g["dimensions"]))
-            req = self._required_branches(plan, dims)
-            did = decision_id_for(dims)
-            refs, contrast = self._pick_witnesses(st, dims)
+            owned_key = g.get("joint_id") or g.get("choice_id") or ("dimension:" + "+".join(dims))
+            req = [r for r in self._required_branches(plan, dims)
+                   if r["choice_id"] == owned_key or set(next(c["dimensions"] for c in plan["choices"] if c["choice_id"] == r["choice_id"])) <= set(dims)]
+            if g.get("choice_id") and not g.get("phenomenon_id"):
+                req = [r for r in req if r["choice_id"] == g["choice_id"]] or req
+            if g.get("phenomenon_id") and not req:
+                # a phenomenon outside every planned choice still needs its own conditional production branch
+                env = (brief["scope"].get("world") or {}).get("kind")
+                req = [{"conditions": {"environment": env} if env else {"subject_kind": "any"}, "operation_ids": ["op.whole_scene"],
+                        "choice_id": g["phenomenon_id"]}]
+            phenomenon = (st.get("VisualPhenomenon", g["phenomenon_id"]) or {}).get("phenomenon") if g.get("phenomenon_id") else owned_key
+            did = production_choice_id(owned_key, phenomenon or owned_key)
+            owned = sorted({owned_key} | {r["choice_id"] for r in req})
+            refs, contrast = self._pick_witnesses(st, dims, phenomenon_id=g.get("phenomenon_id"))
             if not refs:
                 return "STOPPED", {"stop_reason": "BLOCKER_NO_WITNESS_FOR_DIMENSIONS", "dimensions": dims}
             p = st.get("ActiveArtProblem", f"{self.run_id}:{did}")
@@ -462,8 +604,9 @@ class RealLoopRunner:
             ans = vis.request_json(task, "question_answer", QA_SYSTEM, json.dumps(payload), imgs,
                                    source_shas=sorted({wits[w]["film_sha256"] for w in (q.observed_contrast_with_witness_ids or refs)[:6]}))
 
-            def writer(qq, aa, _dims=dims, _req=req):
-                return author_decision(st, qq.to_dict(), aa, dims=_dims, registered_ops=registered(), required_branches=_req)
+            def writer(qq, aa, _dims=dims, _req=req, _did=did, _owned=owned, _ph=phenomenon):
+                return author_decision(st, qq.to_dict(), aa, dims=_dims, registered_ops=registered(), required_branches=_req,
+                                       decision_id=_did, owned_choice_ids=_owned, phenomenon=_ph or _did)
             try:
                 eff = lc.apply_answer(p, q, ans, decision_writer=writer)
             except Blocked as b:
@@ -472,7 +615,13 @@ class RealLoopRunner:
                 from ..style.authoring import register_relations_from_answer
                 if q.answer_status in ("OBSERVED", "INFERRED"):
                     register_relations_from_answer(st, q.to_dict(), ans, dims)
+            if g.get("phenomenon_id"):
+                dd = st.get("ConditionalVisualDecision", did)
+                ph = st.get("VisualPhenomenon", g["phenomenon_id"])
+                if dd and dd.get("status") != "RESEARCH_ONLY":       # explained only by an EXECUTABLE owning decision
+                    st.put("VisualPhenomenon", g["phenomenon_id"], {**ph, "status": "EXPLAINED", "explained_by": did})
             trace["steps"].append({"question_id": q.question_id, "stage": q.owner_stage, "gap": g["gap_id"], "gap_signature": sig,
+                                   "decision_id": did, "owned_choice_ids": owned, "queued_gaps": len(rev["gap_details"]) - 1,
                                    "dims": dims, "question": q.question_text[:400], "task": task, "witnesses": [i[0] for i in imgs],
                                    "answer_status": q.answer_status, "effect": eff, "decision_changed": bool(eff.get("decision_changed"))})
             st.put("RealInvestigationTrace", self.run_id, trace)
@@ -491,13 +640,93 @@ class RealLoopRunner:
                 out.append(ent)
         return out
 
+    def _reinspect(self, st, vis, g: dict, attempt: int, trace: dict) -> dict:
+        """R11 / A28 P5: for a source-grounded gap, re-open the ORIGINAL imagery at its true resolution — the most relevant
+        full frames, region crops and temporal neighbours — and ask ONE targeted question. New relations become witnesses."""
+        from ..reference.frames import native_crop
+        used = int((st.get("ReinspectionBudget", self.run_id) or {}).get("used", 0))
+        if used >= self.cfg.reinspection_budget:
+            return {"status": "REINSPECTION_BUDGET_EXHAUSTED", "used": used}
+        if attempt > self.cfg.max_attempts_per_gap:
+            return {"status": "NO_NEW_EVIDENCE", "attempts": attempt - 1}
+        dims = g["dimensions"]
+        if g.get("phenomenon_id"):
+            ph = st.get("VisualPhenomenon", g["phenomenon_id"])
+            anchors = [(x["film_sha256"], x["frame_index"], x.get("region")) for x in ph.get("sightings", [])[:2]] or \
+                      [(ph["film_sha256"], ph["frame_index"], ph.get("region"))]
+        else:
+            ws = sorted(st.list("Witness"), key=lambda w: (-len(set(w.get("dimensions", [])) & set(dims)), w["witness_id"]))
+            seen_frames, anchors = set(), []
+            for w in ws:
+                key = (w["film_sha256"], w["frame_start"])
+                if key in seen_frames or w.get("evidence_kind") != "FULL_FRAME":
+                    continue
+                seen_frames.add(key)
+                anchors.append((w["film_sha256"], w["frame_start"], w.get("region")))
+                if len(anchors) >= 2:
+                    break
+        if not anchors:
+            return {"status": "NO_SOURCE_FRAMES_TO_REINSPECT"}
+        imgs, req_items = [], []
+        for film, k, region in anchors:
+            _, idx, cache = self._film(film)
+            full = cache.frame(k)
+            r = region or {"x": full.width // 4, "y": full.height // 4, "w": full.width // 2, "h": full.height // 2}
+            r = {kk: int(r[kk]) for kk in ("x", "y", "w", "h")}
+            crop = native_crop(full, r["x"], r["y"], r["w"], r["h"])
+            nbs = [cache.frame(j) for j in (max(0, k - 1), min(len(idx) - 1, k + 1)) if j != k]
+            imgs.append((f"FULL {film[:16]}:{k}", full.png_bytes, full.width, full.height))
+            imgs.append((f"NATIVE_CROP {film[:16]}:{k} x={r['x']} y={r['y']} w={r['w']} h={r['h']}", crop.png_bytes, crop.output_width, crop.output_height))
+            imgs += [(f"NEIGHBOUR {film[:16]}:{x.presentation_index}", x.png_bytes, x.width, x.height) for x in nbs]
+            req_items.append({"film": film, "frame": k, "region": r, "crop_sha": crop.crop_png_sha256, "neighbours": [x.presentation_index for x in nbs]})
+        question = (f"Gap {g['gap_id']} ({g['kind']}): {g['what']}. In these full frames, native crops and neighbours, which visible "
+                    f"relations involving {' + '.join(dims) or 'the unexplained behaviour'} does a producer need to decide for a NEW subject? "
+                    "Return UNKNOWN for anything the pixels do not show.")
+        from ..vision.protocol import pass_instructions
+        tid = custom_id_for("reinspection", {"gap": g["gap_id"], "what": g["what"], "attempt": attempt, "items": req_items,
+                                             "model": vis.caps.model_id})
+        resp = vis.request_json(tid, "native_detail", pass_instructions("P5"), json.dumps({"reason": question, "dimensions": dims,
+                                                                                           "gap": g, "items": req_items}),
+                                imgs[: vis.caps.max_images_per_request], source_shas=sorted({a[0] for a in anchors}))
+        st.put("ReinspectionBudget", self.run_id, {"used": used + 1, "budget": self.cfg.reinspection_budget})
+        new = []
+        for j, rel in enumerate(resp.get("relations") or []):
+            rd = [d for d in (rel.get("dimensions") or []) if isinstance(d, str)]
+            if is_vague_statement(rel.get("relation", "")) or not set(rd) & set(dims or rd):
+                continue
+            film, k, _ = anchors[0]
+            item = req_items[0]
+            wid = f"W-{film[:10]}-{k}-reinspect-{digest([g['gap_id'], attempt, j])[:8]}"
+            _, idx, _c = self._film(film)
+            st.put("Witness", wid, {"witness_id": wid, "film_sha256": film, "sequence_id": f"reinspect:{g['gap_id']}", "frame_start": k,
+                                    "frame_end": k, "evidence_kind": "NATIVE_CROP", "observer": "VLM", "visible_relation": rel["relation"],
+                                    "image_sha256": item["crop_sha"], "region": item["region"],
+                                    "parent_full_frame_witness": f"W-{film[:10]}-{k}-0",
+                                    "temporal_neighbor_witnesses": [f"W-{film[:10]}-{x}-0" for x in item["neighbours"]],
+                                    "subject_class": None, "scene_specific_facts": [], "observation_ids": [f"{film[:16]}:{k}"],
+                                    "limits": "gap-driven reinspection at true source resolution", "dimensions": sorted(set(rd) | set(dims)),
+                                    "pts_time": idx[k]["pts_time"], "evidence_origin": self.p.evidence_origin, "from_gap": g["gap_id"]})
+            new.append(wid)
+        if g.get("phenomenon_id") and resp.get("phenomenon_dimensions"):
+            ph = st.get("VisualPhenomenon", g["phenomenon_id"])
+            st.put("VisualPhenomenon", g["phenomenon_id"], {**ph, "connected_dimensions": sorted(set(ph["connected_dimensions"]) |
+                                                                                                  set(resp["phenomenon_dimensions"]))})
+        trace["steps"].append({"stage": "SOURCE_REINSPECTION", "gap": g["gap_id"], "gap_kind": g["kind"], "task": tid, "question": question[:400],
+                               "requested_items": req_items, "witnesses": [i[0] for i in imgs], "new_witness_ids": new,
+                               "remaining_unknown": resp.get("uncertainty", []), "decision_changed": False})
+        return {"status": "NEW_WITNESSES" if new else "NO_NEW_EVIDENCE", "new_witness_ids": new, "task": tid}
+
     @staticmethod
-    def _pick_witnesses(st, dims: list[str]) -> tuple[list, list]:
+    def _pick_witnesses(st, dims: list[str], phenomenon_id: str | None = None) -> tuple[list, list]:
         ws = [w for w in st.list("Witness") if set(w.get("dimensions", [])) & set(dims)]
+        if phenomenon_id:
+            ph = st.get("VisualPhenomenon", phenomenon_id)
+            near = [w for w in st.list("Witness") if w["film_sha256"] == ph["film_sha256"] and abs(w["frame_start"] - ph["frame_index"]) <= 1]
+            ws = near + [w for w in ws if w not in near]
         ws.sort(key=lambda w: (-len(set(w["dimensions"]) & set(dims)), w["witness_id"]))
         refs, films = [], set()
         for w in ws:
-            if w["film_sha256"] not in films and w["evidence_kind"] == "FULL_FRAME":
+            if w["film_sha256"] not in films and w["evidence_kind"] in ("FULL_FRAME", "NATIVE_CROP") and len(refs) < 3:
                 refs.append(w["witness_id"])
                 films.add(w["film_sha256"])
             if len(refs) >= 3:
@@ -521,21 +750,30 @@ class RealLoopRunner:
 
     # ---- S4: author the real skill from decisions; completeness on the authored skill ---------------------
     def _s4(self, st):
-        from ..style.authoring import author_skill, verify_structural_derivation
+        from ..style.authoring import verify_structural_derivation
         from ..style.coverage import OriginalScope, review_visual_model_completeness
         from ..skills.operators import registered
+        from ..style.authoring import publish_skill_version, current_skill
         decs = [d for d in st.list("ConditionalVisualDecision") if not d.get("synthetic") and d["status"] != "RESEARCH_ONLY"]
         version = f"0.{len(st.versions('RealSkillVersion', self.run_id)) + 1}"
-        folder = self.ws.skills_dir / f"real-{self.run_id.lower()}"
+        root = self.ws.skills_dir / f"real-{self.run_id.lower()}"
         oc = {"op.whole_scene": {"width": 1536, "height": 864, "format": "PNG", "asset_kind": "WHOLE_SCENE"},
+              "op.world_plate": {"width": 1536, "height": 864, "format": "PNG", "asset_kind": "WORLD_PLATE"},
               **{k: {"width": 1024, "height": 1024, "format": "PNG", "asset_kind": "CHARACTER"} for k in
                  ("op.canonical_character", "op.face_view_state", "op.hand_prop_contact", "op.region_edit")}}
-        if not (folder / "FROZEN.json").exists():
-            res = author_skill(folder, decs, skill_id=f"real-{self.run_id.lower()}", version=version, evidence_origin=self.p.evidence_origin,
-                               output_contracts=oc)
-        else:
+        cur = current_skill(root)
+        if cur and (Path(cur["folder"]) / "FROZEN.json").exists() and cur.get("decisions_sha") == digest(sorted(d["decision_id"] + str(d["version"]) for d in decs)):
             from ..skills.skill import skill_hash
+            folder = Path(cur["folder"])
             res = {"folder": str(folder), "skill_hash": skill_hash(folder), "derivations": "FROZEN (unchanged)"}
+        else:
+            res = publish_skill_version(root, decs, skill_id=f"real-{self.run_id.lower()}", version=version,
+                                        evidence_origin=self.p.evidence_origin, output_contracts=oc,
+                                        exemplar_loader=self._exemplar_loader(st), consent_for=self._reference_consent(st))
+            folder = Path(res["folder"])
+            from ..util import atomic_write_json
+            atomic_write_json(root / "CURRENT.json", {**current_skill(root),
+                                                      "decisions_sha": digest(sorted(d["decision_id"] + str(d["version"]) for d in decs))})
         v = verify_structural_derivation(folder)
         if not v["ok"]:
             return "STOPPED", {"stop_reason": "CLAUSE_DERIVATION_BROKEN", "problems": v["problems"][:5]}
@@ -545,11 +783,40 @@ class RealLoopRunner:
         skill_decs = json.loads((folder / "decisions.json").read_text(encoding="utf-8"))
         rev = review_visual_model_completeness(L, scope, skill_decs, registered())
         st.put("RealSkillVersion", self.run_id, {"version": version, **{k: v for k, v in res.items() if k != "derivations"}})
+        if res.get("reference_problems"):
+            mand = [p for p in res["reference_problems"] if p.get("mandatory")]
+            if mand:
+                return "STOPPED", {"stop_reason": "MANDATORY_REFERENCE_BYTES_MISSING", "problems": mand[:5], "skill_folder": str(folder)}
         if not rev["review"]["image_trial_ready"]:
             return "STOPPED", {"stop_reason": rev["review"]["state"], "gap": rev["controlling_gap"]}
         return "COMPLETED", {"skill_folder": str(folder), "skill_hash": res["skill_hash"], "version": version, "derivations": res["derivations"],
+                             "references": res.get("references"),
                              "coverage_state": rev["review"]["state"], "evidence_origin": self.p.evidence_origin,
                              "artistic_quality": "ARTISTIC_QUALITY_UNPROVEN"}
+
+    def _exemplar_loader(self, st):
+        """witness id → exact source bytes (full frame, or the native crop region) + provenance, identity-verified."""
+        from ..reference.frames import native_crop
+
+        def load(wid: str):
+            w = st.get("Witness", wid)
+            if not w:
+                raise Blocked("EXEMPLAR_WITNESS_MISSING", wid)
+            _, idx, cache = self._film(w["film_sha256"])
+            fr = cache.frame(w["frame_start"])
+            r = w.get("region")
+            if w.get("evidence_kind") == "NATIVE_CROP" and r:
+                b = native_crop(fr, int(r["x"]), int(r["y"]), int(r["w"]), int(r["h"])).png_bytes
+            else:
+                b = fr.png_bytes
+            return b, {"film_sha256": w["film_sha256"], "frame_index": w["frame_start"], "evidence_kind": w.get("evidence_kind"), "region": r}
+        return load
+
+    @staticmethod
+    def _reference_consent(st):
+        def lookup(film_sha: str):
+            return st.get("ReferenceExemplarConsent", film_sha)
+        return lookup
 
     # ---- S5: Runware probe (once) + skill execution through compiler and sole gateway -----------------
     def _gateway(self, st):

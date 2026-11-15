@@ -111,6 +111,7 @@ class MockVisionProvider:
                 "simultaneous_event_links": [], "camera_vs_actor_vs_drawing_state": "UNKNOWN",
                 "material_finish_or_colour_change": [], "native_detail_followups": [], "source_fact_statements": [],
                 "hypothesis_or_uncertainty": ["MOCK provider: no perception claims"], "confidence_limitations": ["MOCK"],
+                "persistent_state_ids": [], "unexplained_phenomena": [],
             })
             prev_mean = mean
         resp: Any = {"receipt": {"images_received": len(images)}, "frame_observations": obs,

@@ -149,9 +149,16 @@ def _respond(params) -> dict:
     if kind == "window_rationale":
         return _rationale(user, imgs)
     if kind == "native_detail":
-        return {"relations": [{"relation": "SIMULATED: in the native crop the focal edge separates from the surrounding region by value contrast "
-                                           f"(crop mean {_stats(imgs[1][1])} vs frame {_stats(imgs[0][1])})", "dimensions": ["SHAPE_SURFACE_DETAIL"]}],
-                "changes_vs_neighbours": "SIMULATED: compared with neighbours the crop region shifts slightly", "uncertainty": ["SIMULATED"]}
+        dims = [d for d in user.get("dimensions") or [] if isinstance(d, str)] or ["SHAPE_SURFACE_DETAIL"]
+        if "gap" in user and user["gap"].get("phenomenon_id"):
+            dims = sorted(set(dims) | {"DEPTH_VIEWPOINT"})
+        rel = {"relation": "SIMULATED: in the native crop the focal edge separates from the surrounding region by value contrast "
+                           f"(crop mean {_stats(imgs[1][1])} vs frame {_stats(imgs[0][1])}) while the neighbours keep the same overlap order",
+               "dimensions": dims}
+        if user.get("dimensions") is not None and not user.get("dimensions") and not user.get("gap", {}).get("phenomenon_id"):
+            return {"relations": [], "changes_vs_neighbours": "SIMULATED: UNKNOWN", "uncertainty": ["SIMULATED: pixels do not show it"]}
+        return {"relations": [rel], "changes_vs_neighbours": "SIMULATED: compared with neighbours the crop region shifts slightly",
+                "uncertainty": ["SIMULATED: material cause not determinable from 720p pixels"], "phenomenon_dimensions": dims}
     if kind == "question_answer":
         return _answer(user, imgs)
     return {}
@@ -181,11 +188,17 @@ def _frame_packet(user, imgs) -> dict:
                     "simultaneous_event_links": [], "camera_vs_actor_vs_drawing_state": "UNKNOWN", "material_finish_or_colour_change": [],
                     "native_detail_followups": [{"region": {"x": 8, "y": 8, "w": 32, "h": 24}, "reason": "SIMULATED: verify edge treatment"}] if k % 7 == 0 else [],
                     "source_fact_statements": [f"fixture tint reading at index {k}: {m}"], "subject_class": CLASSES[k % len(CLASSES)],
-                    "hypothesis_or_uncertainty": ["SIMULATED"], "confidence_limitations": ["SIMULATED transport — not perception"]})
+                    "hypothesis_or_uncertainty": ["SIMULATED"], "confidence_limitations": ["SIMULATED transport — not perception"],
+                    "persistent_state_ids": ["sim_focal"],
+                    "unexplained_phenomena": ([{"phenomenon": "SIMULATED: a foreground element passes in front of the focal form while the focal "
+                                                              "form keeps its silhouette and the setting holds still",
+                                                "why": "SIMULATED: no current decision says which layer may occlude the focal actor",
+                                                "connected_dimensions": ["DEPTH_VIEWPOINT", "SUBJECT_WORLD_INTEGRATION"],
+                                                "region": {"x": 4, "y": 4, "w": 24, "h": 16}}] if k == 11 else [])})
         prev = m
     return {"frame_observations": obs,
             "packet_transition_graph": {"edges": [[a["frame_id"], b["frame_id"]] for a, b in zip(obs, obs[1:])]},
-            "boundary_state": {"scene_world": "SIMULATED", "active_objects": [], "open_events": [], "attention": "UNKNOWN", "hypotheses": [],
+            "boundary_state": {"scene_world": "SIMULATED", "active_objects": ["sim_focal"], "open_events": [], "attention": "UNKNOWN", "hypotheses": [],
                                "open_questions": [q.get("question_id") for q in user["active_questions"]]},
             "reconciled_events": [{"event_id": e.get("event_id"), "resolution": "CONTINUES"} for e in (user.get("prior_boundary_state") or {}).get("open_events", [])],
             "question_update": None}
@@ -209,6 +222,7 @@ def _answer(user, imgs) -> dict:
     dims = user["dimensions"]
     ops = user["allowed_operations"]
     base = {"answer_status": "INFERRED" if q["owner_stage"] != "SOURCE_OBSERVATION" else "OBSERVED",
+            "REFERENCE_REQUIRED": dims == ["CHARACTER_WHOLE_DESIGN"] or (dims == ["CHARACTER_BODY_HAND_CONTACT"]),
             "SOURCE_VISIBLE_FACTS": [{"relation": f"SIMULATED: in {w} the {' and '.join(d.lower() for d in dims)} relation holds as parts change together relative to the setting",
                                       "witness_ids": [w]} for w in wids[:3]],
             "IMPORTANT_LINKED_CHANGES": [d.lower() for d in dims],
@@ -221,8 +235,13 @@ def _answer(user, imgs) -> dict:
             "INVARIANT": "SIMULATED: connected major parts with value separation from the setting",
             "ADAPTS_WITH": ["subject anatomy", "material"], "CREATIVE_FREEDOM": ["original identity", "palette choice within the brief"],
             "FORBIDDEN_SOURCE_SPECIFIC": ["source character identity", "source logos"]}
-    base["BRANCHES"] = [{"when": rb["conditions"], "operation_id": rb["operation_ids"][0],
-                         "construction_action": (f"SIMULATED: draw the {{subject}} with {' and '.join(d.lower().replace('_', ' ') for d in dims)} decided together, "
-                                                 f"keeping its connected parts separated from the {{setting}} by value grouping ({', '.join(f'{k}={v}' for k, v in sorted(rb['conditions'].items()))})")}
+    def action(rb):
+        cond = ', '.join(f'{k}={v}' for k, v in sorted(rb['conditions'].items()))
+        if rb["operation_ids"][0] == "op.world_plate":
+            return (f"SIMULATED: paint the {{setting}} as an empty plate whose depth layers keep a clear value step between near and far "
+                    f"planes, leaving the focal area open for a separately drawn actor ({cond})")
+        return (f"SIMULATED: draw the {{subject}} with {' and '.join(d.lower().replace('_', ' ') for d in dims)} decided together, "
+                f"keeping its connected parts separated from the {{setting}} by value grouping ({cond})")
+    base["BRANCHES"] = [{"when": rb["conditions"], "operation_id": rb["operation_ids"][0], "construction_action": action(rb)}
                         for rb in user["required_branches"]]
     return base

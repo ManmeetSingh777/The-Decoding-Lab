@@ -267,8 +267,8 @@ class ClaudeBatchVisionAdapter:
             role = "TARGET" if f in request["target_frames"] else "CONTEXT"
             labelled.append((f"FRAME {f['frame_id']} [{role}] image_sha={f['image_sha']}", b, im.width, im.height))
         source_shas = sorted({request["film_sha256"]}) if request.get("film_sha256") else []
-        user = json.dumps({k: request[k] for k in ("packet_id", "target_frames", "context_frames", "active_questions", "prior_boundary_state",
-                                                   "required_output_schema")})
+        user = json.dumps({k: request[k] for k in ("packet_id", "protocol", "binding", "target_frames", "context_frames", "active_questions",
+                                                   "prior_boundary_state", "required_output_schema") if k in request})
         resp = self.request_json(task_id, "frame_packet", request["instructions"], user, labelled, source_shas=source_shas)
         if isinstance(resp, dict):
             resp.setdefault("receipt", {})["images_received"] = resp["receipt"].get("images_sent")

@@ -5,8 +5,9 @@ SOURCE ANALYSIS ONLY. This text never becomes an image-generation aesthetic clau
 from __future__ import annotations
 
 from ..util import digest
+from .protocol import PROTOCOL_SHA, PROTOCOL_VERSION, bind, pass_instructions
 
-VISION_PROMPT_VERSION = "vision-investigator/1"
+VISION_PROMPT_VERSION = f"{PROTOCOL_VERSION}/P1"
 
 _TEMPLATE = """ROLE: Visual-artwork and temporal construction investigator.
 INPUT: original consecutive image frames with manifest [frame ID -> actual image], current whole-scene/character state and 1-4 active high-impact questions.
@@ -23,12 +24,32 @@ OUTPUT: strict schema, no natural-language summary instead of frame entries."""
 
 
 def build_vision_request(packet_id: str, target_manifest: list[dict], context_manifest: list[dict],
-                         active_questions: list[dict], prior_boundary: dict | None) -> dict:
+                         active_questions: list[dict], prior_boundary: dict | None, *, source: dict | None = None,
+                         sequence: dict | None = None, active_cluster: dict | None = None, controlling_problem: dict | None = None,
+                         competing: list | None = None) -> dict:
     if not 1 <= len(active_questions) <= 4:
         active_questions = active_questions[:4] or [{"question_id": "NONE", "text": "No active question: record observations only."}]
+    binding = bind(
+        protocol={"version": PROTOCOL_VERSION, "sha": PROTOCOL_SHA, "pass_id": "P1"},
+        source=source or {"sha": (target_manifest[0].get("source_sha") if target_manifest else None), "stream_id": "0:v:0",
+                          "real_resolution": [target_manifest[0].get("width"), target_manifest[0].get("height")] if target_manifest else None,
+                          "source_role_lock_state": "UNSTATED"},
+        sequence=sequence or {"current_packet_start": target_manifest[0]["frame_id"] if target_manifest else None,
+                              "current_packet_end": target_manifest[-1]["frame_id"] if target_manifest else None,
+                              "context_frame_ids": [m["frame_id"] for m in context_manifest]},
+        target_images=[{"frame_id": m["frame_id"], "pts": m.get("pts"), "bytes_sha": m["image_sha"]} for m in target_manifest],
+        prior_boundary=prior_boundary or {"actor_ids": [], "object_ids": [], "drawing_states": [], "open_events": [], "attention": "UNKNOWN",
+                                          "unfinished_hypotheses": []},
+        active_cluster=active_cluster or {"cluster_id": "INITIAL_EVERY_FRAME_PASS", "deficits": [], "open_decisions": []},
+        controlling_problem=controlling_problem or {"missing_producer_choice": (active_questions[0].get("text") if active_questions else "NONE")},
+        current_competing_explanations=competing or [],
+        required_response={"per_frame_records": True, "packet_event_delta": True, "new_source_questions": True, "uncertainty": True,
+                           "next_boundary": True})
     req = {
         "prompt_version": VISION_PROMPT_VERSION,
-        "instructions": _TEMPLATE,
+        "protocol": binding["protocol"],
+        "binding": binding,
+        "instructions": pass_instructions("P1") + chr(10) * 2 + _TEMPLATE,
         "packet_id": packet_id,
         "target_frames": [{"frame_id": m["frame_id"], "image_sha": m["image_sha"], "pts_time": m["pts_time"],
                            "order": i} for i, m in enumerate(target_manifest)],
@@ -36,7 +57,8 @@ def build_vision_request(packet_id: str, target_manifest: list[dict], context_ma
                             "role": "CONTEXT_NOT_TARGET"} for m in context_manifest],
         "active_questions": active_questions,
         "prior_boundary_state": prior_boundary or {},
-        "required_output_schema": "FrameObservation[] + packet_transition_graph + boundary_state + reconciled_events + question_update",
+        "required_output_schema": "FrameObservation[] (+persistent_state_ids, ended_state_ids, unexplained_phenomena) + packet_transition_graph "
+                                  "+ boundary_state + reconciled_events + question_update",
     }
     req["request_sha"] = digest(req)
     return req

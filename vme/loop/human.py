@@ -101,3 +101,17 @@ def freeze_real_skill(ws: Workspace, folder, *, approved_by: str) -> dict:
     from pathlib import Path
     atomic_write_json(Path(folder) / "FROZEN.json", rep)
     return rep
+
+
+def consent_reference_exemplars(ws: Workspace, *, film_sha: str, by: str, statement: str) -> dict:
+    """Human consent to package exemplar bytes from this source film as skill references AND to send those bytes to the
+    image provider (third-party upload). Without it mandatory references block compilation (R08/R16)."""
+    _human(by)
+    st = ws.store()
+    try:
+        rec = {"film_sha256": film_sha, "status": "CONSENTED", "consented_by": by, "statement": statement, "at": now_iso(),
+               "scope": "skill reference exemplars (full frames / native crops) for provider upload under a separate spend authorization"}
+        st.put("ReferenceExemplarConsent", film_sha, rec)
+        return rec
+    finally:
+        st.close()

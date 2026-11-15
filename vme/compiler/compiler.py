@@ -193,8 +193,9 @@ class StyleProgramCompiler:
                 if cid not in clause_ids:
                     clause_ids.append(cid)
         segs: list[dict] = []
+        only = op.get("content_slots")          # e.g. op.world_plate: setting only — no actor/subject content
         for key, label in CONTENT_LABELS:
-            if key in brief.slots:
+            if key in brief.slots and (only is None or key in only):
                 segs.append({"authority": "CONTENT", "brief_field_path": f"slots.{key}", "text": f"{label}: {_escape(brief.slots[key])}"})
         style_segs = []
         for cid in clause_ids:
@@ -203,6 +204,8 @@ class StyleProgramCompiler:
                 raise Blocked("MISSING_PROMPT_CLAUSE", cid)
             if c.get("operation_id") != node["operator"]:
                 raise Blocked("CLAUSE_OPERATION_MISMATCH", cid)
+            if only is not None and set(c.get("allowed_content_slots", [])) - set(only):
+                raise Blocked("CLAUSE_USES_SLOT_OUTSIDE_OPERATION", f"{cid} uses {c.get('allowed_content_slots')} on {node['operator']}")
             style_segs.append((c.get("priority", 100), cid, c))
         for _, cid, c in sorted(style_segs, key=lambda x: (x[0], x[1])):
             segs.append({"authority": "STYLE", "clause_id": cid, "skill_decision_id": c["decision_id"],
@@ -226,20 +229,39 @@ class StyleProgramCompiler:
                     raise Blocked("IDENTITY_BYTES_CHANGED", a)
                 refs.append(("canonical_identity", ia["sha256"], "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()))
                 ref_trace.append({"role": "canonical_identity", "sha256": ia["sha256"], "asset_id": a, "authority": "APPROVED_IDENTITY"})
-        wanted_roles = []
+        # skill-owned visual references (R08/R16): mandatory roles must be present, approved (consent) and fit the provider
+        # limit; optional roles fill remaining slots by decision priority and every omission is recorded, never silent.
+        wanted: list[tuple[int, str, bool, str]] = []
         for did in sorted(selected):
-            for r in selected[did]["branch"].get("reference_role_ids", []):
-                if r not in wanted_roles:
-                    wanted_roles.append(r)
+            br = selected[did]["branch"]
+            mand = (set(br["mandatory_reference_role_ids"]) if br.get("mandatory_reference_role_ids") is not None
+                    else set(br.get("reference_role_ids", [])))
+            for r in br.get("reference_role_ids", []):
+                if r not in [w[1] for w in wanted]:
+                    wanted.append((0 if r in mand else 1, r, r in mand, did))
+        wanted.sort(key=lambda w: (w[0], selected[w[3]]["branch"].get("priority", 100), w[1]))
         source_shas = []
-        for role in wanted_roles:
-            cands = [r for r in skill["references"] if r["role"] == role and r.get("approved")]
+        omitted: list[dict] = []
+        max_refs_cap = int(caps.get("max_reference_images", 0))
+        for _, role, mandatory, did in wanted:
+            all_c = [r for r in skill["references"] if r["role"] == role]
+            cands = [r for r in all_c if r.get("approved")]
             if not cands:
-                raise Blocked("REQUIRED_STYLE_REFERENCE_MISSING", role)
+                code = "STYLE_REFERENCE_CONSENT_MISSING" if all_c else "REQUIRED_STYLE_REFERENCE_MISSING"
+                if mandatory:
+                    raise research_ticket(code, missing_decision=did, affected_state=node_id,
+                                          question=f"supply/approve the consented exemplar bytes for mandatory reference role {role}",
+                                          reason=f"{code}: {role} (decision {did})")
+                omitted.append({"role": role, "decision_id": did, "reason": code})
+                continue
+            if not mandatory and len(refs) >= max_refs_cap:
+                omitted.append({"role": role, "decision_id": did, "reason": "OPTIONAL_REFERENCE_OVER_PROVIDER_LIMIT"})
+                continue
             r = sorted(cands, key=lambda x: (x.get("priority", 100), x["ref_id"]))[0]
             p = Path(skill["folder"]) / "references" / r["path"]
             refs.append((role, r["sha256"], "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()))
             ref_trace.append({"role": role, "sha256": r["sha256"], "ref_id": r["ref_id"], "authority": "SKILL_REFERENCE",
+                              "mandatory": mandatory, "decision_id": did,
                               "source_witness_id": r.get("source_witness_id"), "source_film_sha256": r.get("source_film_sha256")})
             if r.get("source_film_sha256"):
                 source_shas.append(r["source_film_sha256"])
@@ -339,7 +361,7 @@ class StyleProgramCompiler:
                  "selected_decisions": sorted(selected),
                  "selected_branches": {did: selected[did]["branch"]["when"] for did in sorted(selected)},
                  "clause_ids": [s["clause_id"] for s in segs if s["authority"] == "STYLE"], "segments": segs,
-                 "reference_trace": ref_trace, "stages": stages, "negative_trace": neg_trace, "field_ownership": ownership,
+                 "reference_trace": ref_trace, "optional_references_omitted": omitted, "stages": stages, "negative_trace": neg_trace, "field_ownership": ownership,
                  "interface_two_audit": audit, "scene_art_plan": plan, "scene_art_plan_sha": digest(plan),
                  "caps_snapshot_id": caps.get("snapshot_id"), "caps_sha": digest(caps), "conditions": conditions,
                  "requires_source_upload_consent_for": sorted(set(source_shas)),

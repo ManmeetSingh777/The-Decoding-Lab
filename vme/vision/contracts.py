@@ -27,6 +27,7 @@ FRAME_OBSERVATION_FIELDS = (
     "changed_since_prior_frame", "simultaneous_event_links", "camera_vs_actor_vs_drawing_state",
     "material_finish_or_colour_change", "native_detail_followups", "source_fact_statements",
     "hypothesis_or_uncertainty", "raw_response_path", "confidence_limitations",
+    "persistent_state_ids", "unexplained_phenomena",          # Addendum 28 (ST28-01/06)
 )
 DIFF_KINDS = ("OBSERVED_DIFF", "INFERRED_3D", "INFERRED_CAMERA", "INFERRED_NEW_DRAWING", "UNKNOWN")
 
@@ -115,7 +116,9 @@ def validate_packet_response(response: Any, target_manifest: list[dict], prior_b
         for c in changes:
             if isinstance(c, dict) and c.get("kind") not in DIFF_KINDS:
                 problems.append(f"BAD_DIFF_KIND:{o['frame_id']}")
-        if is_vague_statement(str(o.get("focal_whole_artwork_state", ""))):
+        if not str(o.get("focal_whole_artwork_state", "")).strip():
+            problems.append(f"EMPTY_FRAME_ENTRY:{o['frame_id']}")
+        elif is_vague_statement(str(o.get("focal_whole_artwork_state", ""))):
             weak.append(o["frame_id"])
     if hash_mismatch:
         return {"ok": False, "status": "QUARANTINED", "problems": problems + [f"IMAGE_HASH_MISMATCH:{hash_mismatch[:5]}"],
@@ -135,6 +138,14 @@ def validate_packet_response(response: Any, target_manifest: list[dict], prior_b
         for ev in prior_boundary.get("open_events", []):
             if ev.get("event_id") not in recon:
                 problems.append(f"BOUNDARY_EVENT_NOT_RECONCILED:{ev.get('event_id')}")
+        # ST28-06: identities active at the previous boundary must persist or be explicitly ended in the first target frame
+        first = next((o for o in sorted([x for x in obs if isinstance(x, dict) and x.get("frame_id") in want],
+                                        key=lambda x: list(want).index(x["frame_id"]))), None)
+        if first is not None:
+            carried = set(first.get("persistent_state_ids") or []) | set(first.get("ended_state_ids") or [])
+            lost = [a for a in prior_boundary.get("active_objects", []) if a not in carried]
+            if lost:
+                problems.append(f"BOUNDARY_IDENTITY_NOT_RECONCILED:{lost[:5]}")
     if problems:
         return {"ok": False, "status": "NEEDS_REINSPECTION", "problems": problems, "weak": weak}
     return {"ok": True, "status": "VALIDATED", "problems": [], "weak": weak, "observations": obs,

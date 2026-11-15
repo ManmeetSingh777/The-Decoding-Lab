@@ -64,6 +64,8 @@ def set_relation(ledger: dict, relation_id: str, participants: list, status: str
                  producing_effect: str, missing_decisions: list | None = None) -> dict:
     if status not in REL_STATUSES:
         raise Blocked("BAD_RELATION_STATUS", status)
+    if status == "SUPPORTED" and not evidence:
+        raise Blocked("SUPPORTED_RELATION_WITHOUT_WITNESS", relation_id)   # R10: no empty-evidence joint support
     e = {"relation_id": relation_id, "participants": sorted(participants), "evidence": evidence, "status": status,
          "producing_effect": producing_effect, "missing_decisions": missing_decisions or []}
     ledger["relations"][:] = [r for r in ledger["relations"] if r["relation_id"] != relation_id] + [e]
@@ -107,6 +109,10 @@ def reverse_plan(scope: OriginalScope) -> dict:
         assets.append({"asset": "world_layers", "kind": "LAYER"})
         need("world:layers", ["WORLD_ASSEMBLY", "DEPTH_VIEWPOINT"], "world_layers", "layer_extract")
         joints.append({"joint_id": "world_layers+viewpoint", "dimensions": ["WORLD_ASSEMBLY", "DEPTH_VIEWPOINT"], "seed": "depth_and_attention"})
+    if any(s.get("kind") == "character" for s in scope.subjects):
+        # separate clean world plate so a separately produced actor is never duplicated over a scene that contains it (R18)
+        assets.append({"asset": "world_plate", "kind": "WORLD_PLATE"})
+        need("world:clean_plate", ["WORLD_ASSEMBLY"], "world_plate", "world_plate", conditions={"environment": w.get("kind")})
     for s in scope.subjects:
         sid = s["id"]
         cond = {k: s[k] for k in ("view", "role") if s.get(k)}
@@ -167,10 +173,20 @@ def reverse_plan(scope: OriginalScope) -> dict:
 
 
 # ---- investigator -------------------------------------------------------------------------
+def owns(d: dict, key: str, dims) -> bool:
+    """Production-choice ownership (R10). Evidence-authored decisions own ONLY the choice/joint ids they declare;
+    sharing a dimension tag is never ownership. Legacy fixture decisions (no `owned_choice_ids`) fall back to the
+    dimension cover and are labelled CATEGORY_LEVEL_LEGACY in coverage traces."""
+    if d.get("status") == "RESEARCH_ONLY":
+        return False
+    if "owned_choice_ids" in d:
+        return key in d["owned_choice_ids"] and set(dims) <= set(d.get("dimension_tags", []))
+    return set(dims) <= set(d.get("dimension_tags", []))
+
+
 def _owner_for(choice: dict, decisions: list[dict], registered_ops: dict) -> tuple[str | None, str | None]:
     """Return (decision_id, problem) where problem in {None, MISSING_DECISION, MISSING_OPERATION}."""
-    cands = [d for d in decisions if set(choice["dimensions"]) <= set(d.get("dimension_tags", []))
-             and d.get("status") != "RESEARCH_ONLY"]
+    cands = [d for d in decisions if owns(d, choice["choice_id"], choice["dimensions"])]
     if not cands:
         return None, "MISSING_DECISION"
     for d in cands:
@@ -229,8 +245,8 @@ class VisualModelCompletenessInvestigator:
         rels = ledger["relations"]
         for j in plan["joint_choices"]:
             dims = set(j["dimensions"])
-            rel_ok = any(r["status"] == "SUPPORTED" and dims <= set(r["participants"]) for r in rels)
-            owner = [d for d in decisions if dims <= set(d.get("dimension_tags", [])) and d.get("status") != "RESEARCH_ONLY"]
+            rel_ok = any(r["status"] == "SUPPORTED" and dims <= set(r["participants"]) and r.get("evidence") for r in rels)
+            owner = [d for d in decisions if owns(d, j["joint_id"], dims)]
             if not rel_ok or not owner:
                 gap("MISSING_JOINT_DECISION", f"no {'supported relation' if not rel_ok else 'joint decision'} for {j['joint_id']}",
                     dims, joint_id=j["joint_id"], seed=j["seed"],

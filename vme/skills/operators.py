@@ -11,6 +11,9 @@ from ..util import Blocked
 OPERATORS: dict[str, dict] = {
     "op.whole_scene": {"kind": "whole_scene", "backend": "provider", "requires": ["textToImage"],
                        "outputs": ["WHOLE_SCENE"], "identity_reference_required": False},
+    "op.world_plate": {"kind": "world_plate", "backend": "provider", "requires": ["textToImage"],
+                       "outputs": ["WORLD_PLATE"], "identity_reference_required": False, "content_slots": ["setting"],
+                       "note": "clean environment with NO actor, so separately generated actors are never duplicated (R18)"},
     "op.canonical_character": {"kind": "canonical_character", "backend": "provider", "requires": ["textToImage"],
                                "outputs": ["CHARACTER_CANONICAL"], "identity_reference_required": False},
     "op.guided_pose_edit": {"kind": "guided_pose_edit", "backend": "provider", "requires": ["imageEdit", "referenceImages"],
@@ -31,7 +34,7 @@ OPERATORS: dict[str, dict] = {
                          "outputs": ["MP4"], "identity_reference_required": False},
 }
 
-PROVIDER_OPERATION_KINDS = ("whole_scene", "canonical_character", "guided_pose_edit", "region_edit", "clean_plate")
+PROVIDER_OPERATION_KINDS = ("whole_scene", "world_plate", "canonical_character", "guided_pose_edit", "region_edit", "clean_plate")
 
 
 def get_operator(op_id: str) -> dict:
