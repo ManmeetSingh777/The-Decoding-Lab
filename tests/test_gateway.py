@@ -90,8 +90,8 @@ def test_offline_output_is_decoded_real_raster_with_honest_cost(tmp_path, store,
     assert body["inputs"]["referenceImages_count"] == 2  # actual bytes were sent, not just IDs
 
 
-@pytest.mark.parametrize("mode,code", [("invalid_bytes", "INVALID_IMAGE_BYTES"), ("http_error", "PROVIDER_EXECUTION"),
-                                       ("url_only", "PROVIDER_URL_EXPIRED_OR_UNFETCHED"), ("wrong_size", "OUTPUT_DIMENSION_MISMATCH"),
+@pytest.mark.parametrize("mode,code", [("invalid_bytes", "INVALID_IMAGE_BYTES"), ("http_error", "PROVIDER_REJECTED"),
+                                       ("url_only", "PROVIDER_URL_HOST_NOT_ALLOWED"), ("wrong_size", "OUTPUT_DIMENSION_MISMATCH"),
                                        ("no_image", "PROVIDER_NO_IMAGE")])
 def test_provider_failures_never_reported_as_art(tmp_path, store, skill, brief, caps, mode, code):
     g, _ = offline_gateway(store, tmp_path, caps, mode=mode)

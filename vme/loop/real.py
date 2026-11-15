@@ -15,6 +15,7 @@ from pathlib import Path
 from ..util import Blocked, digest, is_vague_statement, now_iso, read_json
 from ..state.workspace import Workspace
 from ..vision.runner import maybe_crash
+from ..providers.ids import custom_id_for
 
 STAGES = ("S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")
 CONSUMERS = {
@@ -203,7 +204,9 @@ class RealLoopRunner:
                     continue
                 keys = [a, (a + b) // 2, b]
                 imgs = [(f"FRAME {sha[:16]}:{k} pts_time={idx[k]['pts_time']:.6f}", cache(idx[k])["png"], src["width"], src["height"]) for k in keys]
-                resp = vis.request_json(f"rat-{cid}", "window_rationale", RATIONALE_SYSTEM,
+                tid = custom_id_for("window_rationale", {"source_sha": sha, "window": [a, b], "frames": [idx[k]["frame_content_sha256"] for k in keys],
+                                                         "model": vis.caps.model_id, "system_sha": digest(RATIONALE_SYSTEM)})
+                resp = vis.request_json(tid, "window_rationale", RATIONALE_SYSTEM,
                                         json.dumps({"window": {"start": a, "end": b}, "frames": keys, "window_index": made}), imgs,
                                         source_shas=[sha])
                 cand = {"film_sha": sha, "candidate_id": cid, "start_frame_index": a, "end_frame_index_inclusive": b,
@@ -318,7 +321,10 @@ class RealLoopRunner:
                 imgs = [(f"FULL {film[:16]}:{k}", full.png_bytes, full.width, full.height),
                         (f"NATIVE_CROP {film[:16]}:{k} x={r['x']} y={r['y']} w={r['w']} h={r['h']}", crop.png_bytes, crop.output_width, crop.output_height)]
                 imgs += [(f"NEIGHBOUR {film[:16]}:{x.presentation_index}", x.png_bytes, x.width, x.height) for x in nb]
-                resp = vis.request_json(f"nd-{wid}", "native_detail", NATIVE_SYSTEM, json.dumps({"reason": f.get("reason"), "frame": k}), imgs,
+                tid = custom_id_for("native_detail", {"source_sha": film, "frame": k, "region": r, "crop_sha": crop.crop_png_sha256,
+                                                      "neighbours": [x.png_sha256 for x in nb], "model": vis.caps.model_id,
+                                                      "system_sha": digest(NATIVE_SYSTEM)})
+                resp = vis.request_json(tid, "native_detail", NATIVE_SYSTEM, json.dumps({"reason": f.get("reason"), "frame": k}), imgs,
                                         source_shas=[film])
                 for i, rel in enumerate(resp.get("relations") or []):
                     if is_vague_statement(rel.get("relation", "")):
@@ -450,7 +456,9 @@ class RealLoopRunner:
                 imgs.append((f"WITNESS {wid} frame={w['film_sha256'][:16]}:{w['frame_start']} pts_time={w.get('pts_time')}", fr.png_bytes, fr.width, fr.height))
             payload = {"question": q.to_dict(), "dimensions": dims, "required_branches": req if q.owner_stage == "STYLE_CONDITIONS" else [],
                        "allowed_operations": sorted({o for r in req for o in r["operation_ids"]}) or ["op.whole_scene"]}
-            task = "qa-" + digest([q.question_text, q.planned_witness_or_input_ids, dims])[:24]
+            task = custom_id_for("question_answer", {"question_sha": digest(q.question_text), "witnesses": q.planned_witness_or_input_ids,
+                                                     "image_labels": [i[0] for i in imgs], "dims": dims, "model": vis.caps.model_id,
+                                                     "system_sha": digest(QA_SYSTEM)})
             ans = vis.request_json(task, "question_answer", QA_SYSTEM, json.dumps(payload), imgs,
                                    source_shas=sorted({wits[w]["film_sha256"] for w in (q.observed_contrast_with_witness_ids or refs)[:6]}))
 

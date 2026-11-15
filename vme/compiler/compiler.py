@@ -286,8 +286,8 @@ class StyleProgramCompiler:
             raise Blocked("PROMPT_LIMIT", f"{len(prompt)} > {caps['max_prompt_chars']} (never truncated)")
         payload = {"taskType": "imageInference", "model": caps["model_air_id"], "positivePrompt": prompt,
                    "width": w, "height": h, "numberResults": 1, "outputType": caps.get("output_type", "base64Data"),
-                   "outputFormat": oc["format"]}
-        ownership = {"taskType": "TECHNICAL:provider_adapter", "model": "TECHNICAL:user_confirmed_model_air_id",
+                   "outputFormat": oc["format"], "includeCost": True}
+        ownership = {"includeCost": "TECHNICAL:cost_reporting", "taskType": "TECHNICAL:provider_adapter", "model": "TECHNICAL:user_confirmed_model_air_id",
                      "positivePrompt": "SEGMENTS", "width": "TECHNICAL:output_contract", "height": "TECHNICAL:output_contract",
                      "numberResults": "TECHNICAL:fixed", "outputType": "TECHNICAL:provider_caps", "outputFormat": "TECHNICAL:output_contract"}
         if refs_stage1:
@@ -368,7 +368,7 @@ class StyleProgramCompiler:
         oc = output_contract
         payload = {"taskType": "imageInference", "model": caps["model_air_id"], "positivePrompt": prompt, "width": oc["width"],
                    "height": oc["height"], "numberResults": 1, "outputType": caps.get("output_type", "base64Data"),
-                   "outputFormat": oc["format"]}
+                   "outputFormat": oc["format"], "includeCost": True}
         trace = {"compiler_version": COMPILER_VERSION, "mode": "BASELINE_ONLY", "brief_hash": brief_hash(brief), "segments": segs,
                  "selected_decisions": [], "clause_ids": [], "promotable": False, "caps_sha": digest(caps)}
         lsha = digest({"payload": payload, "baseline": True})

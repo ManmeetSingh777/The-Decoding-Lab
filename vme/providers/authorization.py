@@ -77,16 +77,30 @@ class AuthorizationRegistry:
                 return ProviderAuthorization(**a)
         return None
 
+    @property
+    def ledger(self):
+        from .ledger import SpendLedger
+        return SpendLedger(self.path.parent / "SPEND_LEDGER.sqlite")
+
     def spent(self, auth_id: str) -> float:
-        return float(self._load()["spend"].get(auth_id, 0.0))
+        """Total exposure: settled actual cost + every open reservation / unknown liability (R07)."""
+        return float(self._load()["spend"].get(auth_id, 0.0)) + self.ledger.exposure(auth_id)
 
     def record_spend(self, auth_id: str, usd: float) -> None:
-        d = self._load()
-        d["spend"][auth_id] = float(d["spend"].get(auth_id, 0.0)) + float(usd)
-        atomic_write_json(self.path, d)
+        raise Blocked("UNRESERVED_SPEND_FORBIDDEN", "spend is recorded only by settling a reservation (reserve-before-submit)")
+
+    def reserve(self, *, provider: str, model_id: str, task: str, estimated_cost_usd: float | None, logical_job_id: str,
+                source_shas: list | None = None) -> tuple[ProviderAuthorization, dict]:
+        """Permission checks + atomic reservation BEFORE any network submission. Idempotent per logical job."""
+        a = self.check(provider=provider, model_id=model_id, task=task, estimated_cost_usd=estimated_cost_usd,
+                       source_shas=source_shas, _skip_cap=True)
+        assert estimated_cost_usd is not None
+        r = self.ledger.reserve(auth_id=a.auth_id, provider=provider, cap_usd=a.spend_cap_usd - float(self._load()["spend"].get(a.auth_id, 0.0)),
+                                logical_job_id=logical_job_id, estimated_max_cost=float(estimated_cost_usd))
+        return a, r
 
     def check(self, *, provider: str, model_id: str, task: str, estimated_cost_usd: float | None,
-              source_shas: list | None = None) -> ProviderAuthorization:
+              source_shas: list | None = None, _skip_cap: bool = False) -> ProviderAuthorization:
         """Raise Blocked unless all three permissions hold. Returns the governing authorization."""
         if not network_allowed():
             raise Blocked("NETWORK_DISABLED", "VME_ALLOW_NETWORK is not set; offline build")
@@ -101,6 +115,6 @@ class AuthorizationRegistry:
                 raise Blocked("SOURCE_NOT_IN_CONSENT_SCOPE", str([s[:12] for s in outside]))
         if estimated_cost_usd is None:
             raise Blocked("COST_UNKNOWN_STOP", "no verified cost estimate; refusing to guess")
-        if self.spent(a.auth_id) + estimated_cost_usd > a.spend_cap_usd + 1e-9:
+        if not _skip_cap and self.spent(a.auth_id) + estimated_cost_usd > a.spend_cap_usd + 1e-9:
             raise Blocked("SPEND_CAP_EXCEEDED", f"spent {self.spent(a.auth_id):.4f} + {estimated_cost_usd:.4f} > cap {a.spend_cap_usd}")
         return a

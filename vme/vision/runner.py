@@ -5,7 +5,6 @@ Spec 10 §3–§6, Addendum 24 D2, Addendum 25 §2.2, A19/A61–A66, B03–B08, 
 from __future__ import annotations
 
 import os
-import uuid
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Callable
@@ -13,6 +12,7 @@ from typing import Callable
 from ..util import (Blocked, atomic_write_bytes, atomic_write_json, canonical_json, digest, now_iso,
                     read_json, sha256_file)
 from ..state.store import Store
+from ..providers.ids import packet_custom_id
 from .contracts import frame_id_for, validate_packet_response
 from .prompt import VISION_PROMPT_VERSION, build_vision_request
 
@@ -175,7 +175,7 @@ class PacketRunner:
             state = "INPUTS_READY"
         response = None
         if state == "INPUTS_READY":
-            task_id = f"{p.idempotency_key}-{uuid.uuid5(uuid.NAMESPACE_URL, p.packet_id)}"
+            task_id = packet_custom_id(p)          # <=64 [A-Za-z0-9_-], stable per canonical request descriptor (R01)
             with self.store.tx() as c:  # persist task id BEFORE submitting (no blind re-bill)
                 self._set(p.packet_id, "REQUEST_IN_FLIGHT", c, provider_task_id=task_id)
             maybe_crash("after_inflight_commit")
@@ -184,7 +184,11 @@ class PacketRunner:
             except Blocked as b:
                 if b.code == "PROVIDER_PENDING":       # submitted; result not ready yet → stays in flight, reconciled later
                     return "REQUEST_IN_FLIGHT"
-                if b.code in ("PROVIDER_REFUSAL", "PROVIDER_EXECUTION"):
+                if b.code == "SUBMISSION_UNCERTAIN":
+                    with self.store.tx() as c:
+                        self._set(p.packet_id, "UNKNOWN_BILLING", c, error=b.code)
+                    return "UNKNOWN_BILLING"
+                if b.code in ("PROVIDER_REFUSAL", "PROVIDER_EXECUTION", "PROVIDER_OUTPUT_TRUNCATED", "PROVIDER_NON_JSON"):
                     with self.store.tx() as c:
                         self._set(p.packet_id, "NEEDS_REINSPECTION", c, error=b.code)
                     return "NEEDS_REINSPECTION"
@@ -201,9 +205,10 @@ class PacketRunner:
             try:
                 q = self.provider.query(task_id)
             except Blocked as b:
+                st_ = "UNKNOWN_BILLING" if b.code == "SUBMISSION_UNCERTAIN" else "NEEDS_REINSPECTION"
                 with self.store.tx() as c:
-                    self._set(p.packet_id, "NEEDS_REINSPECTION", c, error=b.code)
-                return "NEEDS_REINSPECTION"
+                    self._set(p.packet_id, st_, c, error=b.code)
+                return st_
             if q is not None and q.get("status") == "PENDING":
                 return "REQUEST_IN_FLIGHT"
             if q is None:

@@ -179,10 +179,9 @@ def test_crash_after_every_stage_commit_resumes(tmp_path):
 def test_hard_kill_mid_packet_reconciles_batches(tmp_path):
     code = f"""
 import sys, os, json; sys.path.insert(0, r'{ROOT}')
+from pathlib import Path
 from vme.testing.drill import build_drill_workspace, drill_providers, drive, enable_network_flag
 from vme.state.workspace import Workspace
-from vme.loop.real import RealLoopRunner
-from vme.testing.drill import drill_config
 root = Path(r'{tmp_path}')
 enable_network_flag()
 if not (root / 'ws' / 'state' / 'SOURCE_LOCK.json').exists():

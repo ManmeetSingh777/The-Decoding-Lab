@@ -3,7 +3,7 @@ name = "visual-mastery-engine"
 version = "0.1.0-offline-audit"
 description = "VME v1.3 + Addenda 24-27 offline engineering build (no learned style; synthetic fixtures labelled)"
 requires-python = ">=3.11"
-dependencies = ["pillow==12.3.0", "numpy==2.5.4", "jsonschema==4.25.1"]
+dependencies = ["pillow==12.3.0", "numpy==2.5.4", "jsonschema==4.25.1", "anthropic==2.8.0"]
 
 [project.optional-dependencies]
 dev = ["pytest==8.4.2", "pyflakes==3.4.0", "mypy==1.18.2"]

@@ -28,25 +28,60 @@ JOINTS = [["CHARACTER_FACE_ACTING", "DEPTH_VIEWPOINT", "MATERIAL_LIGHT_FINISH"],
 CLASSES = ["biped", "creature", "machine", "landscape"]
 
 
+class SimulatedAPIStatusError(Exception):
+    """Mirrors the SDK's APIStatusError surface (`status_code`) for strict rejection paths."""
+
+    def __init__(self, status_code: int, message: str):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class SimulatedConnectionError(Exception):
+    """Transport failure AFTER the simulated server accepted and billed the batch (accept_then_raise mode)."""
+
+
+_CID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_PARAM_KEYS = {"model", "max_tokens", "messages", "system", "output_config", "temperature", "thinking", "metadata", "stop_sequences"}
+
+
 class _Batches:
+    """STRICT Message Batches fake: rejects invalid custom_id (1-64 [A-Za-z0-9_-]), duplicate ids within a batch, unknown
+    params, missing model/max_tokens/messages; every successful create() is a NEW billable batch (no cross-batch dedup)."""
+
     def __init__(self, root: Path, mode: str):
         self.root, self.mode = root, mode
 
+    def _validate(self, reqs) -> None:
+        ids = [r.get("custom_id") for r in reqs]
+        for cid in ids:
+            if not isinstance(cid, str) or not _CID.fullmatch(cid):
+                raise SimulatedAPIStatusError(400, f"invalid_request_error: custom_id {cid!r} must match ^[a-zA-Z0-9_-]{{1,64}}$")
+        if len(set(ids)) != len(ids):
+            raise SimulatedAPIStatusError(400, "invalid_request_error: duplicate custom_id within batch")
+        for r in reqs:
+            pr = r.get("params") or {}
+            if set(pr) - _PARAM_KEYS or not isinstance(pr.get("model"), str) or not isinstance(pr.get("max_tokens"), int)                     or not isinstance(pr.get("messages"), list):
+                raise SimulatedAPIStatusError(400, f"invalid_request_error: params {sorted(pr)}")
+
     def create(self, *, requests):
         reqs = list(requests)
-        bid = "msgbatch_sim_" + digest([r["custom_id"] for r in reqs])[:16]
-        p = self.root / f"{bid}.json"
-        if p.exists():   # the provider would create a new batch; the adapter must never call twice for one task
-            rec = read_json(p)
-            rec["duplicate_creates"] = rec.get("duplicate_creates", 0) + 1
-            atomic_write_json(p, rec)
-            return NS(id=bid, processing_status="in_progress")
+        self._validate(reqs)
+        n = len(list(self.root.glob("msgbatch_*.json")))
+        bid = f"msgbatch_sim_{n:04d}_" + digest([r["custom_id"] for r in reqs])[:12]
+        seen = {c for p in self.root.glob("msgbatch_*.json") for c in read_json(p)["custom_ids"]}
+        dup = sum(1 for r in reqs if r["custom_id"] in seen)
         results = [{"custom_id": r["custom_id"], "text": json.dumps(_respond(r["params"])), "in": _in_tokens(r["params"])} for r in reqs]
-        atomic_write_json(p, {"id": bid, "results": results, "retrieves": 0, "billed_requests": len(reqs), "mode": self.mode})
+        atomic_write_json(self.root / f"{bid}.json", {"id": bid, "custom_ids": [r["custom_id"] for r in reqs], "results": results,
+                                                     "retrieves": 0, "billed_requests": len(reqs), "mode": self.mode,
+                                                     "duplicate_creates": dup})
+        if self.mode == "accept_then_raise":
+            raise SimulatedConnectionError("connection reset after the batch was accepted")
         return NS(id=bid, processing_status="in_progress")
 
     def retrieve(self, bid):
         p = self.root / f"{bid}.json"
+        if not p.exists():
+            raise SimulatedAPIStatusError(404, f"not_found_error: {bid}")
         rec = read_json(p)
         rec["retrieves"] += 1
         atomic_write_json(p, rec)
@@ -56,7 +91,16 @@ class _Batches:
     def results(self, bid):
         rec = read_json(self.root / f"{bid}.json")
         for r in rec["results"]:
-            msg = NS(content=[NS(type="text", text=r["text"])], stop_reason="end_turn", usage=NS(input_tokens=r["in"], output_tokens=900))
+            if self.mode in ("errored", "expired", "canceled"):
+                yield NS(custom_id=r["custom_id"], result=NS(type=self.mode, error={"type": "simulated"}))
+                continue
+            text, stop = r["text"], "end_turn"
+            if self.mode == "truncated":
+                text, stop = text[: len(text) // 2], "max_tokens"
+            elif self.mode == "non_json":
+                text = "SIMULATED: I looked at the frames and they are nice."
+            msg = NS(content=[NS(type="text", text=text)], stop_reason=stop, model="SIMULATED",
+                     usage=NS(input_tokens=r["in"], output_tokens=900))
             yield NS(custom_id=r["custom_id"], result=NS(type="succeeded", message=msg))
 
 

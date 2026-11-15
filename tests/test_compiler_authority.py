@@ -77,23 +77,64 @@ def test_runtime_style_append_and_raw_prompt_refused(tmp_path, store, skill, bri
     assert not hasattr(g, "submit_prompt") and not any(n for n in dir(g) if "prompt" in n.lower())
 
 
-@pytest.mark.req("C14", "ADD26-A01")
+def _ast_scan(text: str) -> dict:
+    """AST call-target scan (R24): who BUILDS a positivePrompt dict, who CALLS a provider send/transport/urlopen,
+    and who merely CONSTRUCTS the http transport factory (construction is not a send)."""
+    import ast
+    tree = ast.parse(text)
+    out = {"builds_prompt": False, "sends": [], "constructs_http_transport": False}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Dict) and any(isinstance(k, ast.Constant) and k.value == "positivePrompt" for k in n.keys):
+            out["builds_prompt"] = True
+        if isinstance(n, ast.Call):
+            f = n.func
+            name = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else None
+            if name in ("send", "urlopen") or (isinstance(f, ast.Attribute) and f.attr == "transport"):
+                out["sends"].append(ast.unparse(f))
+            if name == "http_transport":
+                out["constructs_http_transport"] = True
+    return out
+
+
+@pytest.mark.req("C14", "ADD26-A01", "R24")
 def test_static_scan_only_compiler_builds_positive_prompt_and_only_gateway_sends():
     src = ROOT / "vme"
-    builders, senders = [], []
+    builders, senders, constructors = [], {}, []
     for p in src.rglob("*.py"):
-        text = p.read_text(encoding="utf-8")
         rel = p.relative_to(src).as_posix()
-        if re.search(r'["\']positivePrompt["\']\s*:', text):
+        r = _ast_scan(p.read_text(encoding="utf-8"))
+        if r["builds_prompt"]:
             builders.append(rel)
-        if re.search(r"\.send\(|http_transport\(", text) and "runware" in text.lower():
-            senders.append(rel)
+        if r["sends"]:
+            senders[rel] = r["sends"]
+        if r["constructs_http_transport"]:
+            constructors.append(rel)
     # audit/export.py is an explicit NEGATIVE DRILL: it hands a raw positivePrompt dict to the gateway to record the refusal.
     drills = {"audit/export.py"}
     assert sorted(set(builders) - drills) == ["compiler/compiler.py"]
     drill_src = (src / "audit" / "export.py").read_text(encoding="utf-8")
     assert re.search(r'g\.submit\(\{"positivePrompt"', drill_src), "drill must only feed the raw dict to the gateway (expected refusal)"
-    assert set(senders) <= {"providers/gateway.py", "providers/runware.py"}
+    # the ONLY provider send call sites: gateway (adapter.send) and the adapter/transport itself
+    # vision/providers.py calls a VISION transport (source analysis, separately authorized); it must not touch Runware
+    vision_src = (src / "vision" / "providers.py").read_text(encoding="utf-8")
+    assert "runware" not in vision_src.lower() and "RunwareAdapter" not in vision_src
+    assert senders.get("vision/providers.py", []) in ([], ["self.transport"])
+    senders.pop("vision/providers.py", None)
+    assert set(senders) <= {"providers/gateway.py", "providers/runware.py"}, senders
+    assert all(c in ("self.adapter.send",) for c in senders.get("providers/gateway.py", []))
+    # the http transport may be CONSTRUCTED only by the production provider bundle, which hands it to the gateway's adapter
+    assert set(constructors) <= {"loop/real.py", "providers/runware.py"}
+    real_src = (src / "loop" / "real.py").read_text(encoding="utf-8")
+    assert re.search(r"image_transport=http_transport\(api\)", real_src)
+
+
+@pytest.mark.req("R24")
+def test_static_scanner_still_catches_an_unauthorized_send():
+    bad = "from vme.providers.runware import RunwareAdapter\nRunwareAdapter({}, t).send(b'[]')\n"
+    assert _ast_scan(bad)["sends"] == ["RunwareAdapter({}, t).send"]
+    assert _ast_scan("x = {'positivePrompt': 'p'}")["builds_prompt"]
+    assert _ast_scan("import urllib.request\nurllib.request.urlopen('https://api.runware.ai')")["sends"]
+    assert not _ast_scan("# .send( http_transport( runware")["sends"]          # comments/strings are not calls
 
 
 @pytest.mark.req("ADD25-P05", "A56", "B20", "ADD27-9")
