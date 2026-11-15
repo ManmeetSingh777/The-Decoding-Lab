@@ -850,6 +850,12 @@ def build(out_zip: Path, *, real_workspace: Path, skip_fresh: bool = False, reus
     write_docs(audit, summary=summary, repo_checks=repo_checks, fresh=fresh)
     files = _assemble(out_zip, audit, real_ws, extra)
     chk = verify_zip(out_zip)
+    with zipfile.ZipFile(out_zip) as z:
+        names = set(z.namelist())
+    need = ["SHA256_MANIFEST.json"] + ["visual-mastery-engine/audit/" + n for n in ("ROOT_CAUSE_MATRIX.json", "CRITICAL_REPAIR_CROSSWALK.json",
+            "TEST_RESULTS_REPO.json", "WHAT_IS_NOT_YET_PROVEN.md", "ANSWERS_A_TO_G.md", "FINAL_STATUS.txt")]
+    chk["required_present"] = all(n in names for n in need)   # this audit's own file list, not the phase-1 exporter's
+    chk["ok"] = not chk["media_files"] and not chk["decoded_source_frames"] and not chk["secret_hits"] and chk["required_present"]
     return {"zip": str(out_zip), "sha256": sha256_file(out_zip), "files": len(files), "self_check": chk, **summary}
 
 
