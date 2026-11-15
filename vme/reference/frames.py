@@ -131,3 +131,53 @@ def resized_for_provider(frame: RetrievedFrame, max_side: int) -> RetrievedFrame
     b = buf.getvalue()
     return RetrievedFrame(frame.film_sha256, frame.presentation_index, frame.pts, frame.pts_time, im2.width,
                           im2.height, frame.raw_sha256, frame.identity_verified, b, sha256_bytes(b), s, False)
+
+
+def retrieve_range(video: str | Path, recs: list[dict], *, pix_fmt: str = "yuv420p") -> list[RetrievedFrame]:
+    """Decode a contiguous run of presented frames in ONE ffmpeg pass; verify every frame's raw hash."""
+    if not recs:
+        return []
+    exe = require_tool("ffmpeg")
+    a, b = recs[0], recs[-1]
+    w, h = a["frame_width"], a["frame_height"]
+    size = int(w * h * _PIXBYTES.get(pix_fmt, 1.5))
+    seek = max(0.0, a["pts_time"] - 2.0)
+    cmd = [exe, "-v", "error", "-nostdin", "-copyts", "-ss", f"{seek:.6f}", "-i", str(video), "-map", "0:v:0",
+           "-vf", "select='between(pts\\," + str(a["pts"]) + "\\," + str(b["pts"]) + ")'", "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", pix_fmt, "-"]
+    out = subprocess.run(cmd, capture_output=True)
+    if out.returncode != 0:
+        raise Blocked("FRAME_DECODE_FAILED", out.stderr.decode(errors="replace")[:300])
+    raws = [out.stdout[i:i + size] for i in range(0, len(out.stdout), size)]
+    if len(raws) != len(recs):
+        raise Blocked("RANGE_FRAME_COUNT_MISMATCH", f"decoded {len(raws)} expected {len(recs)}")
+    res = []
+    for rec, raw in zip(recs, raws):
+        rsha = sha256_bytes(raw)
+        if rsha != rec["frame_content_sha256"]:
+            raise Blocked("FRAME_IDENTITY_MISMATCH", f"index {rec['presentation_index']}")
+        png = raw_to_png(raw, pix_fmt, w, h)
+        res.append(RetrievedFrame(rec["film_sha256"], rec["presentation_index"], rec["pts"], rec["pts_time"], w, h, rsha, True, png,
+                                  sha256_bytes(png)))
+    return res
+
+
+class FrameCache:
+    """Loader for PacketRunner: decodes whole contiguous chunks on a miss (real path; identity verified per frame)."""
+
+    def __init__(self, video: str | Path, index: list[dict], chunk: int = 16):
+        self.video, self.index, self.chunk = video, index, chunk
+        self.cache: dict[int, dict] = {}
+
+    def __call__(self, rec: dict) -> dict:
+        k = rec["presentation_index"]
+        if k not in self.cache:
+            lo, hi = k, min(len(self.index) - 1, k + self.chunk - 1)
+            for fr in retrieve_range(self.video, self.index[lo:hi + 1]):
+                self.cache[fr.presentation_index] = {"png": fr.png_bytes, "png_sha": fr.png_sha256, "raw_sha": fr.raw_sha256,
+                                                     "w": fr.width, "h": fr.height, "scale": 1.0}
+        return self.cache[k]
+
+    def frame(self, k: int) -> RetrievedFrame:
+        d = self(self.index[k])
+        r = self.index[k]
+        return RetrievedFrame(r["film_sha256"], k, r["pts"], r["pts_time"], d["w"], d["h"], d["raw_sha"], True, d["png"], d["png_sha"])

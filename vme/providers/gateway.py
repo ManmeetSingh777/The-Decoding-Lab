@@ -50,6 +50,9 @@ class StyleImageGateway:
         if self.adapter.kind == "REAL":
             if job.synthetic:
                 raise Blocked("SYNTHETIC_SKILL_TO_REAL_PROVIDER", "fixture skills never reach a paid provider")
+            origin = job.trace.get("skill_evidence_origin", "REAL_VLM")
+            if getattr(self.adapter, "transport_kind", "NETWORK") == "NETWORK" and origin not in ("REAL_VLM", None) and not job.baseline_only:
+                raise Blocked("SIMULATED_EVIDENCE_SKILL_TO_NETWORK", f"skill evidence origin {origin} cannot drive a paid call")
             assert_paid_ready(self.adapter.snapshot, probe=probe)
             est = self.adapter.snapshot.get("cost_per_image_usd")
             self._auth = self.registry.check(provider="runware", model_id=job.logical_payload["model"], task=task_category,
@@ -137,7 +140,9 @@ class StyleImageGateway:
                   "skill_hash": job.trace.get("skill_hash"), "selected_decisions": job.trace.get("selected_decisions"),
                   "clause_ids": job.trace.get("clause_ids"), "reference_shas": [r[1] for r in job.reference_images],
                   "outputs": outs, "cost_usd": cost, "cost_status": "REPORTED" if cost is not None else "UNKNOWN",
-                  "label": ("OFFLINE_FIXTURE_NOT_LEARNED_ART" if self.adapter.kind != "REAL" else "REAL_PROVIDER_OUTPUT"),
+                  "label": ("OFFLINE_FIXTURE_NOT_LEARNED_ART" if self.adapter.kind != "REAL" else
+                            "REAL_PROVIDER_OUTPUT" if getattr(self.adapter, "transport_kind", "NETWORK") == "NETWORK"
+                            else "SIMULATED_TRANSPORT_FIXTURE_IMAGE"),
                   "committed_at": now_iso()}
         atomic_write_json(d / "result.json", result)
         self.store.put("GeneratedRaster", job.job_id, result)

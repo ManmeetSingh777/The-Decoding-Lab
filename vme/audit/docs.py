@@ -38,9 +38,9 @@ STAGE_MAP = [
 def write_docs(audit: Path, *, matrix: dict, checks: dict, real: dict, traces: dict, workspace: Workspace) -> None:
     t = matrix["totals"]
     rows = matrix["rows"]
-    blocked = [r for r in rows if r["status"] == "BLOCKED"]
+    blocked = [r for r in rows if r["status"] in ("BLOCKED_AUTHORIZATION", "ART_QUALITY_UNPROVEN", "REAL_PATH_WIRED_UNTESTED")]
     fails = [r for r in rows if r["status"] == "FAIL"]
-    notbuilt = [r for r in rows if r["status"] == "NOT_BUILT"]
+    notbuilt = [r for r in rows if r["status"] == "NOT_IMPLEMENTED"]
     py = checks["pytest"]
     W = lambda n, s: atomic_write_text(audit / n, s)
     crash = [r for r in read_json(audit / "TEST_RESULTS.json")["pytest_cases"] if any(k in r["nodeid"] for k in ("kill", "crash", "unqueryable", "unreconcilable"))]
@@ -100,18 +100,19 @@ Observed in this build: pytest exit={py['returncode']}; see audit/logs/*.txt and
     W("UNIMPLEMENTED_OR_BLOCKED.md", "# Unimplemented or blocked\n\n" +
       f"Requirement totals (from executed tests): {json.dumps(t)}\n\n" +
       "## FAIL\n" + ("\n".join(f"- {r['id']}: {r['requirement']} — {r['tests']}" for r in fails) or "- none observed") +
-      "\n\n## NOT_BUILT / untested\n" + ("\n".join(f"- {r['id']}: {r['requirement']}" for r in notbuilt) or "- none") +
-      "\n\n## BLOCKED (offline wiring/refusal proven; positive proof needs PAID / ART / HUMAN)\n" +
-      "\n".join(f"- {r['id']} [{r['needs_for_positive_proof']}]: {r['requirement']}" for r in blocked) +
+      "\n\n## NOT_IMPLEMENTED (no passing REAL-path test)\n" + ("\n".join(f"- {r['id']}: {r['requirement']}" for r in notbuilt) or "- none") +
+      "\n\n## Wired but unproven (REAL_PATH_WIRED_UNTESTED / BLOCKED_AUTHORIZATION / ART_QUALITY_UNPROVEN)\n" +
+      "\n".join(f"- {r['id']} [{r['status']}; needs {r['needs_for_positive_proof'] or 'a real provider run'}]: {r['requirement']}" for r in blocked) +
       """
 
 ## Known engineering limits (truthful)
-- No commercial VLM adapter is selected; `HttpVisionAdapter` is a generic, authorization-gated payload builder. Choosing a provider,
-  verifying its multi-image/ID-mapping limits and price is the first post-audit task.
-- Real first-15 selection cannot run offline: candidate windows exist from the local navigation survey, but whole-artwork rationales
-  must come from a human or an authorized VLM (ADD25-S05). Status NEEDS_SELECTION_REVIEW / NOT_RUN.
-- Sixth clip: role proposed by duration (≈6.8 min, "How to Make a Kurzgesagt Video in 1200 Hours.mp4") — PENDING USER CONFIRMATION;
-  volcano-start / logo-entrance boundaries need the user's choice from the local witness packet (no classifier, no upload).
+- Vision provider: Claude Messages Batches adapter (`vme/vision/claude_adapter.py`, model `claude-opus-5-5`, official SDK) is implemented
+  and exercised ONLY through a SIMULATED client. The 20-images-per-request limit is a planning assumption and the price comes from a cached
+  table — both UNVERIFIED until a consented Models-API discovery call.
+- REAL first-15 selection needs the five base films CONFIRMED by the user (currently quarantined: titles differ from the contract),
+  then authorized VLM rationales. The sixth clip role is USER_CONFIRMED (2026-11-15); its volcano/logo boundaries are still unlocked.
+- Character layers: no segmentation/inpainting capability is verified, so the REAL path uses an explicit WHOLE_STATE_SWAP (whole
+  identity-conditioned drawings swapped by the renderer) instead of pretend layers. Expression states have no decision condition yet.
 - `op.clean_plate` / `op.layer_extract` real implementations depend on provider edit/mask capability; the offline fixture uses a local
   fill on fixture rasters (wiring only). Real segmentation/matting model not chosen.
 - Motion evidence is block-translation based: motion over textureless regions is not counted either way (documented limitation).

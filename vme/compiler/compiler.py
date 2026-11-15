@@ -346,7 +346,8 @@ class StyleProgramCompiler:
                  "authority": {"style": "frozen_skill_clauses", "content": "original_brief_slots",
                                "identity": "approved_identity_assets", "technical": "provider_capabilities"},
                  "style_authority_report": sar, "skill_present_but_not_compiled": eligible_not_selected,
-                 "runtime_style_invention_prohibited": True}
+                 "runtime_style_invention_prohibited": True,
+                 "skill_evidence_origin": skill["manifest"].get("evidence_origin", "SYNTHETIC_FIXTURE" if skill["synthetic"] else "REAL_VLM")}
         inputs = {"brief": raw_brief, "skill_folder": str(skill_folder), "pinned_skill_hash": pinned_skill_hash,
                   "recipe_id": recipe_id, "node_id": node_id, "caps": caps,
                   "identity_assets": {k: {kk: vv for kk, vv in v.items()} for k, v in identity_assets.items()},

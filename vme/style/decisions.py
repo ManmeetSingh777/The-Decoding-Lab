@@ -78,8 +78,8 @@ def classify_statement(text: str, scene_specific_facts: list[str]) -> str:
         terms = [w for w in re.findall(r"[a-z]{4,}", f.lower()) if w not in _GENERIC_WORDS]
         if terms and sum(1 for w in terms if w in t) >= max(1, (len(terms) + 1) // 2):
             return "SCENE_FACT"
-    if _NUMERIC_RATIO.search(t):
-        return "SCENE_FACT"  # copied ratios / colour codes are source facts, not grammar (A30, ADD25-Q03)
+    if _NUMERIC_RATIO.search(t) and not re.search(r"(when|if|for|relative|range|varies|depending|conditional)", t):
+        return "SCENE_FACT"  # unconditional copied constants are source facts; conditional measured relations may transfer
     if is_vague_statement(t):
         return "VAGUE"
     return "STYLE_CANDIDATE"
@@ -102,7 +102,7 @@ def substitution_challenge(reusable_text: str, substitutes: list[dict], scene_sp
 
 
 def witness_to_decision(bundle: WitnessBundle, proposal: dict, *, registered_operators: dict,
-                        substitutes: list[dict]) -> ConditionalVisualDecision:
+                        substitutes: list[dict] | None) -> ConditionalVisualDecision:
     """T1–T5. Raises Blocked for structurally invalid input; otherwise returns a decision whose
     `status`/`research_only_reason` truthfully reflect what is missing."""
     vb = validate_bundle(bundle)
@@ -117,7 +117,9 @@ def witness_to_decision(bundle: WitnessBundle, proposal: dict, *, registered_ope
         raise Blocked("SCENE_FACT_NOT_STYLE", "reusable fields copy source-specific facts/branding/ratios", facts=facts)
     if cls == "VAGUE":
         raise Blocked("VAGUE_STYLE_DECISION", "needs a picture-producing relation, not adjectives")
-    chal = substitution_challenge(reusable, substitutes, facts)
+    # NOTE: text substitution is only a copying LINT, never evidence of visual transfer. The REAL authoring path
+    # passes substitutes=None and relies on contrasting witnesses from other subjects/films instead.
+    chal = substitution_challenge(reusable, substitutes, facts) if substitutes is not None else         [{"verdict": "STYLE_CANDIDATE", "note": "NOT_RUN: conditionality judged from contrasting witnesses, not word swaps"}]
     if any(c["verdict"] != "STYLE_CANDIDATE" for c in chal):
         raise Blocked("FAILS_SOURCE_INDEPENDENCE_CHALLENGE", str([c["verdict"] for c in chal]))
     branches = [DecisionBranch(**b) for b in proposal.get("branches", [])]

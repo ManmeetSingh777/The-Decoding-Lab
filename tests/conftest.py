@@ -30,6 +30,7 @@ def pytest_runtest_makereport(item, call):
         m = item.get_closest_marker("req")
         RESULTS.append({"nodeid": item.nodeid, "outcome": rep.outcome, "when": rep.when,
                         "req_ids": list(m.args) if m else [], "phase": (m.kwargs.get("phase", "OFFLINE") if m else "OFFLINE"),
+                        "path": (m.kwargs.get("path", "ENGINEERING") if m else "ENGINEERING"),
                         "duration_s": round(rep.duration, 3),
                         "longrepr": (str(rep.longrepr)[-1500:] if rep.failed else None)})
 

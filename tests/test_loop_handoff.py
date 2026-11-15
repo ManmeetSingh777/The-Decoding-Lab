@@ -194,17 +194,12 @@ def test_handoff_excludes_mp4_and_secrets(tmp_path):
 
 
 @pytest.mark.req("ADD26-S0S9")
-def test_real_mode_loop_stops_truthfully_at_selection(tmp_path):
-    """REAL mode on a workspace with real-like sources but no visual rationales → STOPPED at S0 (no fabricated selection)."""
+def test_synthetic_runner_has_no_real_mode(tmp_path):
     from vme.state.workspace import Workspace
-    from vme.util import atomic_write_json
     from vme.loop.stages import LoopRunner
-    w = Workspace(tmp_path / "w").ensure()
-    atomic_write_json(w.state_dir / "SOURCE_LOCK.json", {"sources": [{"sha256": c * 64, "role": "BASE_FILM"} for c in "abcde"]})
-    out = LoopRunner(w, run_id="REAL1", mode="REAL").run()
-    assert out["stopped_at"] == "S0" and "NO_VISUAL_RATIONALE" in out["reason"]
-    with pytest.raises(Blocked):
-        LoopRunner(w, run_id="REAL2", mode="REAL", simulate_human=True)
+    with pytest.raises(Blocked) as e:
+        LoopRunner(Workspace(tmp_path / "w").ensure(), run_id="R", mode="REAL")
+    assert e.value.code == "REAL_MODE_MOVED"
 
 
 @pytest.mark.req("ADD24-D4-4", "A47", "A19")

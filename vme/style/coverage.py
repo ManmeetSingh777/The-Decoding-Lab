@@ -93,15 +93,16 @@ def reverse_plan(scope: OriginalScope) -> dict:
 
     def need(cid, dims, asset, op, salience="HIGH", conditions=None):
         choices.append({"choice_id": cid, "dimensions": list(dims), "asset": asset, "operation_kind": op,
-                        "salience": salience, "conditions": conditions or {}})
+                        "salience": salience, "conditions": conditions or dict(envc)})
 
-    for d in ("WHOLE_FRAME_LANGUAGE", "FINISH_AND_READABILITY"):
-        need(f"frame:{d}", [d], "whole_scene", "whole_scene")
     w = scope.world or {}
+    envc = {"environment": w.get("kind")} if w.get("kind") else {}
+    for d in ("WHOLE_FRAME_LANGUAGE", "FINISH_AND_READABILITY"):
+        need(f"frame:{d}", [d], "whole_scene", "whole_scene", conditions=envc)
     assets.append({"asset": "whole_scene", "kind": "WHOLE_SCENE"})
     need("world:assembly", ["WORLD_ASSEMBLY"], "whole_scene", "whole_scene", conditions={"environment": w.get("kind")})
-    need("world:colour", ["COLOUR_RELATIONS"], "whole_scene", "whole_scene")
-    need("world:material_light", ["MATERIAL_LIGHT_FINISH"], "whole_scene", "whole_scene")
+    need("world:colour", ["COLOUR_RELATIONS"], "whole_scene", "whole_scene", conditions=envc)
+    need("world:material_light", ["MATERIAL_LIGHT_FINISH"], "whole_scene", "whole_scene", conditions=envc)
     if w.get("layers"):
         assets.append({"asset": "world_layers", "kind": "LAYER"})
         need("world:layers", ["WORLD_ASSEMBLY", "DEPTH_VIEWPOINT"], "world_layers", "layer_extract")

@@ -33,10 +33,11 @@ def http_transport(api_base: str) -> Transport:
 class RunwareAdapter:
     provider_id = "runware"
 
-    def __init__(self, snapshot: dict, transport: Transport, *, kind: str = "REAL"):
+    def __init__(self, snapshot: dict, transport: Transport, *, kind: str = "REAL", transport_kind: str = "NETWORK"):
         self.snapshot = snapshot
         self.transport = transport
-        self.kind = kind  # "REAL" (network transport) or "OFFLINE_RECORDING"
+        self.kind = kind  # "REAL" (authorization-gated path) or "OFFLINE_RECORDING"
+        self.transport_kind = transport_kind  # NETWORK | SIMULATED (labelled fixture transport behind the REAL path)
 
     def build_body(self, logical_payload: dict, task_uuid: str) -> bytes:
         task = dict(logical_payload)

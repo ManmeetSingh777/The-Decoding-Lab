@@ -18,7 +18,8 @@ from pathlib import Path
 
 from ..util import Blocked, atomic_write_json, atomic_write_text, digest, now_iso, read_json, sha256_bytes, sha256_file
 from ..state.workspace import Workspace
-from .requirements import all_requirements
+from .requirements import all_requirements, REAL_PATH_IDS
+STATUS_VOCAB = ("ENGINEERING_FIXTURE_PASS", "REAL_PATH_WIRED_UNTESTED", "BLOCKED_AUTHORIZATION", "NOT_IMPLEMENTED", "ART_QUALITY_UNPROVEN", "FAIL")
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = ROOT.parent / "Visual_Mastery_Engine_Build_Spec_v1_3"
@@ -93,17 +94,24 @@ def requirement_matrix(raw_results: list[dict]) -> dict:
         else:
             eng = "PASS"
         needs = meta["needs"]
+        real_wired = any(t.get("path") == "REAL" and t["outcome"] == "passed" for t in tests)
         if eng == "FAIL":
             status = "FAIL"
-        elif needs:
-            status = "BLOCKED"
+        elif "ART" in needs:
+            status = "ART_QUALITY_UNPROVEN"            # no real artwork exists; wiring may still be proven (see real_path_wired)
+        elif "PAID" in needs:
+            status = "BLOCKED_AUTHORIZATION" if real_wired else "NOT_IMPLEMENTED"
+        elif rid in REAL_PATH_IDS or "HUMAN" in needs:
+            status = "REAL_PATH_WIRED_UNTESTED" if real_wired else "NOT_IMPLEMENTED"
         elif eng == "PASS":
-            status = "PASS"
+            status = "ENGINEERING_FIXTURE_PASS"
         else:
-            status = "NOT_BUILT" if eng == "NOT_TESTED" else "BLOCKED"
+            status = "NOT_IMPLEMENTED"
         files = sorted({t["nodeid"].split("::")[0].split("/")[-1].replace(".py", "") for t in tests})
         rows.append({"id": rid, "group": meta["group"], "requirement": meta["text"], "needs_for_positive_proof": needs or None,
-                     "engineering_status": eng, "status": status,
+                     "engineering_status": eng, "status": status, "real_path_wired": real_wired,
+                     "independent_evidence": "real local source decode" if any("real" in t["nodeid"] and "test_sources" in t["nodeid"] for t in tests)
+                     else ("REAL handlers with SIMULATED transports (wiring only)" if real_wired else "engineering fixtures"),
                      "module": "; ".join(TEST_OWNERS.get(f, "?") for f in files) or None,
                      "tests": [t["nodeid"] for t in tests], "test_outcomes": outcomes,
                      "blocker": ({"PAID": "needs explicit provider authorization + spend cap (+ source-upload consent)",
@@ -114,7 +122,10 @@ def requirement_matrix(raw_results: list[dict]) -> dict:
     for r in rows:
         totals[r["status"]] = totals.get(r["status"], 0) + 1
     return {"generated_at": now_iso(), "rows": rows, "totals": totals, "unknown_ids_in_tests": sorted(unknown),
-            "note": "BLOCKED = offline wiring/refusal tests pass but positive proof needs PAID/ART/HUMAN; never counted as PASS."}
+            "status_vocabulary": list(STATUS_VOCAB),
+            "note": ("ENGINEERING_FIXTURE_PASS = contract/engineering behaviour proven offline. REAL_PATH_WIRED_UNTESTED = production handler "
+                     "exercised end-to-end through SIMULATED transports, never against a real provider. BLOCKED_AUTHORIZATION = wired, needs "
+                     "paid/consented calls. ART_QUALITY_UNPROVEN = needs real artwork + human judgement. NOT_IMPLEMENTED = no passing REAL test.")}
 
 
 def _strip(o):
@@ -472,6 +483,8 @@ def build_audit_zip(out_zip: Path, *, workspace: Workspace) -> dict:
                                                     "pytest_cases": raw.get("results", []), "generated_at": now_iso()})
     real = real_source_artifacts(audit, workspace)
     traces = generate_traces(audit, workspace)
+    from .repair import generate_repair_artifacts
+    traces.update(generate_repair_artifacts(audit, workspace))
     for g, prefix in (("ADD25", "ADD25-"), ("ADD26", "ADD26-")):
         rows = [r for r in matrix["rows"] if r["id"].startswith(prefix)]
         atomic_write_json(audit / ("ADDENDUM25_TEST_RESULTS.json" if g == "ADD25" else "ADD26_TEST_RESULTS.json"),

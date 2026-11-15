@@ -8,14 +8,14 @@ and are themselves screened for rendering-style vocabulary.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 from ..util import Blocked, digest, new_id, now_iso
 
 CONTENT_SLOTS = ("subject", "setting", "action", "visual_role", "view", "original_prop", "subject_kind", "material",
                  "scale", "environment")
 BRIEF_FIELDS = ("brief_id", "shot_id", "subjects", "actions", "world", "visual_focus", "camera_or_view_requirement",
-                "novelty_constraints", "animation_requirements", "content_provenance", "slots")
+                "novelty_constraints", "animation_requirements", "content_provenance", "slots", "scope", "shot_plan")
 # Rendering/aesthetic vocabulary that belongs to the skill, never to content.
 STYLE_LEXICON = re.compile(
     r"\b(kurzgesagt|in the style of|art style|style|stylized|stylised|vector|flat (design|shading|colou?rs?)|cel[- ]?shad\w*|"
@@ -38,6 +38,8 @@ class OriginalContentBrief:
     animation_requirements: list
     content_provenance: str        # who authored the content (USER/DIRECTOR/FIXTURE)
     slots: dict                    # typed values for CONTENT_SLOTS used by templates
+    scope: dict = field(default_factory=dict)       # typed OriginalScope fields (subjects/world/camera) — content, not style
+    shot_plan: dict = field(default_factory=dict)   # {actions, events, camera, fps, frames} — content/motion requirements
     pool: str = "rotating_development"   # comparison_anchor | rotating_development | unseen_transfer
 
     def to_dict(self) -> dict:
@@ -71,12 +73,13 @@ def validate_brief(raw: dict) -> OriginalContentBrief:
     for k, v in raw["slots"].items():
         if not isinstance(v, str) or "{" in v or "}" in v or "\n" in v or len(v) > 200:
             raise Blocked("CONTENT_SLOT_UNSAFE", k)
-    hits = _scan("brief", {k: v for k, v in raw.items() if k not in ("brief_id", "shot_id", "content_provenance", "pool")})
+    hits = _scan("brief", {k: v for k, v in raw.items() if k not in ("brief_id", "shot_id", "content_provenance", "pool", "shot_plan")})
     if hits:
         raise Blocked("STYLE_INJECTION_IN_CONTENT", f"{len(hits)} style term(s) in content fields",
                       hits=hits, ticket=style_revision_ticket(raw.get("brief_id", "?"), hits))
-    return OriginalContentBrief(**{k: raw.get(k, [] if k in ("novelty_constraints", "animation_requirements", "actions") else "")
-                                   for k in BRIEF_FIELDS}, pool=raw.get("pool", "rotating_development"))
+    return OriginalContentBrief(**{k: raw.get(k, [] if k in ("novelty_constraints", "animation_requirements", "actions") else
+                                              ({} if k in ("scope", "shot_plan") else "")) for k in BRIEF_FIELDS},
+                                pool=raw.get("pool", "rotating_development"))
 
 
 def style_revision_ticket(brief_id: str, hits: list[dict]) -> dict:

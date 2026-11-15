@@ -161,7 +161,7 @@ class GateKeeper:
 
 
 def save_user_review(store, *, run_id: str, verdict: str, top_remaining_gaps: list, preferred_next_focus: str,
-                     submitted_by: str, linked_image_hashes: list) -> dict:
+                     submitted_by: str, linked_image_hashes: list, stage: str = "art", findings: list | None = None) -> dict:
     """04 feedback form: persistent, timestamped, immutable review record."""
     if verdict not in REVIEW_VERDICTS:
         raise Blocked("BAD_REVIEW_VERDICT", verdict)
@@ -169,7 +169,9 @@ def save_user_review(store, *, run_id: str, verdict: str, top_remaining_gaps: li
         raise Blocked("HUMAN_SIGNATURE_REQUIRED")
     r = {"review_id": new_id("rev"), "run_id": run_id, "verdict": verdict, "top_remaining_gaps": top_remaining_gaps,
          "preferred_next_focus": preferred_next_focus, "timestamp": now_iso(), "submitted_by": submitted_by,
-         "linked_image_hashes": linked_image_hashes}
+         "linked_image_hashes": linked_image_hashes, "stage": stage,
+         # findings: [{symptom, attributed_stage, decision_id?, required_conditions?}] — the human's attribution drives the next question
+         "findings": findings or [{"symptom": g, "attributed_stage": "HUMAN_REVIEW"} for g in top_remaining_gaps]}
     store.put("VisualReview", r["review_id"], r)
     store.event("USER_REVIEW", run_id, {"review_id": r["review_id"], "verdict": verdict})
     return r

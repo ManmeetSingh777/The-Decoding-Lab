@@ -106,6 +106,19 @@ ADD27 = {
     "ADD27-12": ("Ungoverned output appearance not credited to skill", ""), "ADD27-13": ("Provenance DAG lineage", ""),
     "ADD27-14": ("Crash during completeness/provenance commit recovers", ""),
 }
+AUDIT_P0 = {
+    "AUDIT-P0-1": ("REAL loop connected S0–S9 (no unconditional blocks; providers injected)", ""),
+    "AUDIT-P0-2": ("Concrete vision provider integration with response conversion and reconciliation", "PAID"),
+    "AUDIT-P0-3": ("Evidence→decision→skill authoring from persisted witnesses (no lexical proof)", "ART"),
+    "AUDIT-P0-4": ("Multi-gap controller with completeness recomputation over the scoped scene", ""),
+    "AUDIT-P0-5": ("Source identities quarantined until user confirmation; resolution reported", "HUMAN"),
+    "AUDIT-P0-6": ("Runware + character asset creation + art/asset/video human review paths", "PAID+ART+HUMAN"),
+}
+# Requirements whose substance is the REAL production path (not engineering contracts): they can be at most
+# REAL_PATH_WIRED_UNTESTED offline, and NOT_IMPLEMENTED unless a path="REAL" test exercises them.
+REAL_PATH_IDS = {"A04", "A10", "A11", "A28", "A52", "A61", "C03", "C12", "C13", "C17", "C18", "ADD24-S0S4-REAL", "ADD25-L0-REAL", "ADD26-S0S9",
+                 "AUDIT-P0-1", "AUDIT-P0-2", "AUDIT-P0-3", "AUDIT-P0-4", "AUDIT-P0-5", "AUDIT-P0-6"}
+
 ORIGINAL_13 = {
     "P01": ("Six connected responsibilities", ["vme.reference", "vme.investigation.gaps", "vme.investigation.controller", "vme.skills", "vme.providers.gateway", "vme.review"]),
     "P02": ("High-impact gap identification", ["vme.investigation.gaps:rank_gaps/select_cluster"]),
@@ -125,7 +138,7 @@ ORIGINAL_13 = {
 
 def all_requirements() -> dict:
     out = {}
-    for group, d in (("A", A), ("B", B), ("C", C), ("ADD24", ADD24), ("ADD25", ADD25), ("ADD26", ADD26), ("ADD27", ADD27)):
+    for group, d in (("A", A), ("B", B), ("C", C), ("ADD24", ADD24), ("ADD25", ADD25), ("ADD26", ADD26), ("ADD27", ADD27), ("AUDIT", AUDIT_P0)):
         for k, (t, n) in d.items():
             out[k] = {"group": group, "text": t, "needs": n}
     return out

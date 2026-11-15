@@ -125,7 +125,7 @@ def locate_earliest_missing_handoff(p: ActiveArtProblem, ctx: ProblemContext) ->
                                                                             "STYLE_CONDITIONS", "CAUSE_INFERENCE")]
     if bad:
         f0 = sorted(bad, key=lambda f: HANDOFF_ORDER.index(f["attributed_stage"]))[0]
-        return {"stage": f0["attributed_stage"], "missing": f0.get("decision_id", did), "why": f0["symptom"], "finding": f0}
+        return {"stage": f0["attributed_stage"], "missing": f0.get("decision_id") or did, "why": f0["symptom"], "finding": f0}
     if ctx.asset_report and not ctx.asset_report.get("ok"):
         return {"stage": "ASSET_FAMILY", "missing": did, "why": ctx.asset_report.get("problems", ["asset failure"])[0]}
     if ctx.render_report and not ctx.render_report.get("ok"):

@@ -35,7 +35,9 @@ CONSUMERS = {
 class LoopRunner:
     def __init__(self, ws: Workspace, *, run_id: str, mode: str = "SYNTHETIC_FIXTURE", simulate_human: bool = False,
                  sources_folder: str | None = None):
-        if mode not in ("SYNTHETIC_FIXTURE", "REAL"):
+        if mode == "REAL":
+            raise Blocked("REAL_MODE_MOVED", "the REAL path lives in vme.loop.real.RealLoopRunner (no fixtures)")
+        if mode != "SYNTHETIC_FIXTURE":
             raise Blocked("BAD_MODE")
         if simulate_human and mode != "SYNTHETIC_FIXTURE":
             raise Blocked("HUMAN_SIMULATION_ONLY_FOR_FIXTURES")
@@ -98,17 +100,6 @@ class LoopRunner:
     def _s0(self, st):
         from ..selection.first15 import propose_selection
         from ..selection.sixth import locate_sixth_intro
-        if self.mode == "REAL":
-            lock = read_json(self.ws.state_dir / "SOURCE_LOCK.json")
-            base = [s["sha256"] for s in lock["sources"] if s["role"] == "BASE_FILM"]
-            cands = st.list("CandidateSequence")
-            man = propose_selection(cands, base)
-            st.put("SelectedSequenceManifest", f"{self.run_id}:15", man)
-            ok = man.get("status") == "PROPOSED_AWAITING_USER_REVIEW"
-            reason = None if ok else ("NO_VISUAL_RATIONALE_CANDIDATES: real candidates need HUMAN or authorized VLM whole-artwork "
-                                      "witness statements before selection (ADD25-S05)")
-            return ("COMPLETED" if ok else "STOPPED"), {"selection": f"{self.run_id}:15", "status": man.get("status"),
-                                                        "selected_count": man.get("selected_count"), "stop_reason": reason}
         from ..fixtures import loop_fixtures as fx
         cands = fx.synthetic_candidates()
         man = propose_selection(cands, fx.SYNTHETIC_BASE_FILMS)
@@ -127,8 +118,6 @@ class LoopRunner:
         from ..vision.providers import MockVisionProvider
         from ..investigation.evidence import build_event_graph, reverse_timeline_check
         from ..vision.contracts import frame_id_for
-        if self.mode == "REAL":
-            raise Blocked("BLOCKED_CONSENT", "per-frame VLM study of real sources requires provider, upload consent and budget")
         from ..fixtures import loop_fixtures as fx
         clip = fx.make_clip(self.dir / "synthetic_seq.mp4", frames=20)
         idx, loader = fx.index_and_loader(clip, self.dir / "seq_idx")

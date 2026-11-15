@@ -165,6 +165,7 @@ class PacketRunner:
         man_sha = digest({"targets": tgt, "context": ctx})
         prior = self.prior_boundary(p)
         req = build_vision_request(p.packet_id, tgt, ctx, self.questions, prior)
+        req["film_sha256"] = p.film_sha256
         if state in ("PLANNED", "RETRY_WAIT", "NEEDS_REINSPECTION", "INPUTS_READY", "QUARANTINED"):
             atomic_write_json(d / "input.json", {"plan": p.to_dict(), "targets": tgt, "context": ctx, "request": req,
                                                  "input_manifest_sha": man_sha})
@@ -181,6 +182,12 @@ class PacketRunner:
             try:
                 response = self.provider.submit(task_id, req, imgs)
             except Blocked as b:
+                if b.code == "PROVIDER_PENDING":       # submitted; result not ready yet → stays in flight, reconciled later
+                    return "REQUEST_IN_FLIGHT"
+                if b.code in ("PROVIDER_REFUSAL", "PROVIDER_EXECUTION"):
+                    with self.store.tx() as c:
+                        self._set(p.packet_id, "NEEDS_REINSPECTION", c, error=b.code)
+                    return "NEEDS_REINSPECTION"
                 with self.store.tx() as c:
                     st = "BLOCKED_CONSENT" if b.code in ("NO_PROVIDER_AUTHORIZATION", "NO_SOURCE_UPLOAD_CONSENT",
                                                           "NETWORK_DISABLED", "SOURCE_NOT_IN_CONSENT_SCOPE",
@@ -191,7 +198,14 @@ class PacketRunner:
             state = "REQUEST_IN_FLIGHT"
         if state == "REQUEST_IN_FLIGHT" and response is None:
             task_id = self._row(p.packet_id)[1]
-            q = self.provider.query(task_id)
+            try:
+                q = self.provider.query(task_id)
+            except Blocked as b:
+                with self.store.tx() as c:
+                    self._set(p.packet_id, "NEEDS_REINSPECTION", c, error=b.code)
+                return "NEEDS_REINSPECTION"
+            if q is not None and q.get("status") == "PENDING":
+                return "REQUEST_IN_FLIGHT"
             if q is None:
                 with self.store.tx() as c:
                     self._set(p.packet_id, "UNKNOWN_BILLING", c, error="CANNOT_QUERY_PENDING_TASK")
@@ -261,7 +275,9 @@ class PacketRunner:
         atomic_write_json(d / "checkpoint.json", checkpoint)
         with self.store.tx() as c:
             for o, m in zip(sorted(v["observations"], key=lambda x: int(x["frame_id"].split(":")[1])), tgt):
-                status = "VISION_OUTPUT_VERIFIED" if self.provider.kind == "REAL" else "MOCK_VERIFIED_SYNTHETIC"
+                tk = getattr(self.provider, "transport_kind", "NETWORK")
+                status = ("VISION_OUTPUT_VERIFIED" if self.provider.kind == "REAL" and tk == "NETWORK" else
+                          "SIMULATED_TRANSPORT_FIXTURE" if self.provider.kind == "REAL" else "MOCK_VERIFIED_SYNTHETIC")
                 c.execute("INSERT OR REPLACE INTO frame_vision(film_sha256,frame_index,pass_id,status,packet_id,image_sha,"
                           "observation_sha,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                           (p.film_sha256, m["presentation_index"], p.pass_id, status, p.packet_id, m["image_sha"],

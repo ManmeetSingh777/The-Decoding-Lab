@@ -138,8 +138,10 @@ def cmd_vision(a):
             _p({"indexed_total": summ.get("total_frames_decoded"), "vision_rows": rows,
                 "real_vlm_seen": sum(r[2] for r in rows if r[1] == "VISION_OUTPUT_VERIFIED")})
         elif a.action in ("run", "plan", "resume"):
-            raise Blocked("BLOCKED_CONSENT", "real per-frame VLM needs a chosen provider, verified capabilities/price, "
-                                             "source-upload consent and a spend cap (vme authorize ...)")
+            st.close()
+            from .cli_real import run_real
+            _p(run_real(ws, a.run_id, "S1"))   # REAL S0–S1; stops only at human decisions / authorization / pending provider
+            st = ws.store()
     finally:
         st.close()
 
@@ -187,7 +189,8 @@ def cmd_art(a):
             "coverage": job.trace["interface_two_audit"], "selected_decisions": job.trace["selected_decisions"],
             "clause_ids": job.trace["clause_ids"], "synthetic": job.synthetic, "allow_paid_call": False})
     elif a.action == "generate":
-        raise Blocked("PAID_GENERATION_NOT_AUTHORIZED", "offline build: no Runware calls (needs vme authorize + VME_ALLOW_NETWORK=1 + probe)")
+        from .cli_real import run_real
+        _p(run_real(ws, a.run or "REAL-001", "S5"))   # REAL path to first art; needs authorization + confirmed model + probe
     elif a.action in ("approve", "reject"):
         from .review.approvals import GateKeeper
         st = ws.store()
@@ -214,10 +217,16 @@ def cmd_review(a):
     from .review.server import serve
     ws = _ws(a)
     st = ws.store()
-    imgs = [{"path": g["outputs"][0]["path"], "sha256": g["outputs"][0]["sha256"], "label": g["label"], "caption": g["job_id"]}
-            for g in st.list("GeneratedRaster")]
+    s5 = (st.get("LoopTransition", f"{a.run}:S5") or {}).get("outputs", {})
+    s7 = (st.get("LoopTransition", f"{a.run}:S7") or {}).get("outputs", {})
+    from .util import sha256_file
+    art = [{"path": v["image"], "sha256": v["sha"], "label": v.get("label", ""), "caption": f"{k} (full resolution)"} for k, v in s5.items()
+           if isinstance(v, dict) and "image" in v]
+    extra = [{"path": f, "sha256": sha256_file(f), "label": "asset-family", "caption": Path(f).name} for f in s7.get("files", []) if f not in {x["path"] for x in art}]
+    rr = st.get("RenderReport", a.run)
     print(f"Serving http://127.0.0.1:{a.port}/  (Ctrl+C to stop)")
-    serve(st, a.run, images=imgs, packet={"gate": st.get("VisualGateState", a.run)}, port=a.port)
+    serve(st, a.run, images=art + extra, packet={"gate": st.get("VisualGateState", a.run), "pack": s7.get("pack")}, port=a.port,
+          video=rr["mp4"] if rr else None, asset_files=s7.get("files"))
 
 
 def cmd_authorize(a):
@@ -309,6 +318,7 @@ def main(argv=None):
     s = sub.add_parser("vision"); s.add_argument("action", choices=["estimate", "plan", "run", "coverage", "resume"])
     s.add_argument("--selection"); s.add_argument("--provider"); s.add_argument("--every-frame", action="store_true")
     s.add_argument("--authorization"); s.add_argument("--by-frame", action="store_true"); s.add_argument("--pass")
+    s.add_argument("--run-id", default="REAL-001")
     s.set_defaults(f=cmd_vision)
     s = sub.add_parser("investigate"); s.add_argument("action", choices=["questions", "explain"]); s.add_argument("--cluster")
     s.add_argument("--question"); s.add_argument("--evidence"); s.set_defaults(f=cmd_investigate)
@@ -338,6 +348,8 @@ def main(argv=None):
     s.add_argument("--simulate-human-fixture", action="store_true"); s.set_defaults(f=cmd_loop)
     s = sub.add_parser("audit"); s.add_argument("action", choices=["export"]); s.add_argument("--offline", action="store_true")
     s.add_argument("--out", required=True); s.set_defaults(f=cmd_audit)
+    from .cli_real import register
+    register(sub, _ws)
     a = ap.parse_args(argv)
     try:
         a.f(a)
