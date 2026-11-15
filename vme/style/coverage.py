@@ -191,7 +191,11 @@ def _owner_for(choice: dict, decisions: list[dict], registered_ops: dict) -> tup
         return None, "MISSING_DECISION"
     for d in cands:
         for br in d.get("branches", []):
-            if all(str(choice["conditions"].get(k)) == str(v) for k, v in br.get("when", {}).items() if k in choice["conditions"]):
+            when = br.get("when", {})
+            # Unknown predicates must not be ignored: that made an action=grip
+            # branch qualify a view=profile requirement (vacuous all([])).
+            if when and all(k in choice["conditions"] and str(choice["conditions"][k]) == str(v)
+                            for k, v in when.items()):
                 ops = br.get("operation_node_ids", [])
                 if ops and all(o in registered_ops for o in ops):
                     return d["decision_id"], None

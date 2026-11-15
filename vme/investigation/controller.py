@@ -96,8 +96,11 @@ def locate_earliest_missing_handoff(p: ActiveArtProblem, ctx: ProblemContext) ->
     dec = ctx.decisions.get(did)
     if dec is None:
         return {"stage": "STYLE_CONDITIONS", "missing": did, "why": "required conditional decision does not exist"}
-    uncovered = {k: v for k, v in p.required_conditions.items()
-                 if not any(str(br.get("when", {}).get(k)) == str(v) for br in dec.get("branches", []))}
+    # A single documented branch must satisfy the JOINT production context.
+    # Two disjoint branches each matching one key are not evidence for the joint state.
+    joint_supported = any(all(str(br.get("when", {}).get(k)) == str(v) for k, v in p.required_conditions.items())
+                          for br in dec.get("branches", []))
+    uncovered = {} if joint_supported else dict(p.required_conditions)
     if uncovered or dec.get("status") == "RESEARCH_ONLY" and dec.get("research_only_reason") in ("MISSING_CONDITIONS", "SINGLE_SOURCE"):
         return {"stage": "STYLE_CONDITIONS", "missing": did, "why": f"no branch for required conditions {uncovered or dec.get('research_only_reason')}",
                 "uncovered_conditions": uncovered}
@@ -348,7 +351,11 @@ def validate_answer(q: NextQuestion, answer: dict, registered_ops: dict) -> dict
         if q.owner_stage in ("SOURCE_OBSERVATION", "CAUSE_INFERENCE", "STYLE_CONDITIONS"):
             if not facts or any(not f.get("witness_ids") for f in facts):
                 problems.append("FACT_WITHOUT_WITNESS")
-            allowed = set(q.observed_contrast_with_witness_ids) | set(answer.get("answer_evidence_ids", []))
+            # Only images selected by the controller and actually supplied to the
+            # source question can authorize a fact. A model cannot self-add IDs.
+            allowed = set(q.observed_contrast_with_witness_ids)
+            if set(answer.get("answer_evidence_ids", [])) - allowed:
+                problems.append("ANSWER_SELF_AUTHORIZED_UNSHOWN_WITNESS")
             for f in facts:
                 if set(f.get("witness_ids", [])) - allowed:
                     problems.append("FACT_CITES_UNPLANNED_WITNESS")

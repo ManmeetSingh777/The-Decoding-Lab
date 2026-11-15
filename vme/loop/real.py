@@ -15,6 +15,7 @@ from pathlib import Path
 from ..util import Blocked, digest, is_vague_statement, now_iso, read_json
 from ..state.workspace import Workspace
 from ..vision.runner import maybe_crash
+from ..vision.protocol import PROTOCOL_SHA, pass_instructions
 from ..providers.ids import custom_id_for
 
 STAGES = ("S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")
@@ -32,7 +33,7 @@ CONSUMERS = {
 }
 OP_FOR_KIND = {"whole_scene": "op.whole_scene", "world_plate": "op.world_plate", "canonical_character": "op.canonical_character", "layer_extract": "op.layer_extract",
                "motion_render": "op.motion_render"}
-RATIONALE_SYSTEM = """SOURCE ANALYSIS ONLY. You see 3 actual frames (start, middle, end) of one contiguous window of a source film.
+RATIONALE_SYSTEM = pass_instructions("P2") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + """SOURCE ANALYSIS ONLY. You see 3 actual frames (start, middle, end) of one contiguous window of a source film.
 Return strict JSON: {"whole_visual_quality_statement": str (a specific visible relationship between designed forms, world, light or motion;
 no standalone adjectives), "selection_role_candidates": subset of ["C","W","T"] (C=character identity/acting, W=complete illustrated world,
 T=changing viewpoint/state/choreography), "opportunities": subset of [character_shape, body_face_relation, whole_body_acting, hand_prop,
@@ -40,7 +41,7 @@ complete_world, integrated_object_artwork, colour_material_finish, viewpoint, st
 spatial_transformation], "visible_proof_for_each_opportunity": {opportunity: frame-anchored description}, "actor_class": str|null,
 "content_label": "MAIN_FILM"|"SPONSOR"|"OUTRO"|"CREDITS"|"INTRO_CARD", "new_question_contributed": str, "known_limitations": [str]}.
 Say UNKNOWN when the frames do not show something. Never claim proprietary production methods."""
-QA_SYSTEM = """SOURCE ANALYSIS ONLY — answer ONE investigation question using ONLY the labelled source images provided
+QA_SYSTEM = pass_instructions("P4") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + """SOURCE ANALYSIS ONLY — answer ONE investigation question using ONLY the labelled source images provided
 (each image is preceded by its witness id). Separate OBSERVED from INFERRED; if the images cannot settle it, answer_status=UNKNOWN.
 Return strict JSON with keys: answer_status (OBSERVED|INFERRED|UNKNOWN|REFUTED), SOURCE_VISIBLE_FACTS [{relation, witness_ids}],
 IMPORTANT_LINKED_CHANGES [str], CONSTRUCTION_EXPLANATION str, WHY_THE_DECISION_MATTERS str, WHEN_APPLICABLE {}, WHEN_NOT_APPLICABLE [str],
@@ -49,7 +50,7 @@ answer_evidence_ids [witness ids], and when the question asks for conditional pr
 [{when:{condition:value}, construction_action: str written for a NEW subject using the placeholders {subject} and {setting}, never source
 nouns, operation_id}], INVARIANT str, ADAPTS_WITH [str], CREATIVE_FREEDOM [str], FORBIDDEN_SOURCE_SPECIFIC [str].
 One BRANCH is required for each entry of required_branches (same conditions, one of its operation_ids)."""
-NATIVE_SYSTEM = """SOURCE ANALYSIS ONLY. Image 1 is a full frame, image 2 a NATIVE-resolution crop of it (no resampling), images 3-4
+NATIVE_SYSTEM = pass_instructions("P5") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + """SOURCE ANALYSIS ONLY. Image 1 is a full frame, image 2 a NATIVE-resolution crop of it (no resampling), images 3-4
 the neighbouring frames. Describe only what the crop shows in relation to the whole frame and the neighbours. Return strict JSON:
 {"relations": [{"relation": str, "dimensions": [str]}], "changes_vs_neighbours": str, "uncertainty": [str]}."""
 
@@ -118,12 +119,17 @@ class RealLoopRunner:
         if stage == "S0":
             x = {"lock": digest(read_json(lockp)) if lockp.exists() else None, "roles": recs("SourceLock"),
                  "vision": prov.get("vision", {}).get("model_id"), "approvals": recs("SelectionApproval"),
-                 "sixth": digest(st.get("SpecialIntroSelection", "REAL"))}
+                 "sixth": digest(st.get("SpecialIntroSelection", "REAL")),
+                 "source_protocol_sha": PROTOCOL_SHA, "rationale_system_sha": digest(RATIONALE_SYSTEM)}
         elif stage == "S1":
-            x = {"sixth": digest(st.get("SpecialIntroSelection", "REAL")), "vision": prov.get("vision", {}).get("model_id")}
+            from ..vision.prompt import VISION_PROMPT_SHA
+            x = {"sixth": digest(st.get("SpecialIntroSelection", "REAL")), "vision": prov.get("vision", {}).get("model_id"),
+                 "source_protocol_sha": PROTOCOL_SHA, "vision_prompt_content_sha": VISION_PROMPT_SHA}
         elif stage == "S2":
             x = {"scope": digest((brief or {}).get("scope")),     # revision IDS only: closing a revision must not re-invalidate S2
-                 "revisions": sorted(r["revision_id"] for r in st.list("ArtRevision") if mine(r))}
+                 "revisions": sorted(r["revision_id"] for r in st.list("ArtRevision") if mine(r)),
+                 "source_protocol_sha": PROTOCOL_SHA, "qa_system_sha": digest(QA_SYSTEM),
+                 "native_system_sha": digest(NATIVE_SYSTEM)}
         elif stage in ("S3", "S4"):
             x = {"decisions": sorted(f"{d['decision_id']}@{d['version']}:{d['status']}" for d in st.list("ConditionalVisualDecision")
                                      if not d.get("synthetic")), "consent": recs("ReferenceExemplarConsent")}

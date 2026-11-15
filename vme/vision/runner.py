@@ -14,9 +14,12 @@ from ..util import (Blocked, atomic_write_bytes, atomic_write_json, canonical_js
 from ..state.store import Store
 from ..providers.ids import packet_custom_id
 from .contracts import frame_id_for, validate_packet_response
-from .prompt import VISION_PROMPT_VERSION, build_vision_request
+from .prompt import VISION_PROMPT_VERSION, VISION_PROMPT_SHA, build_vision_request
+from .protocol import PROTOCOL_SHA
 
 TRANSFORM_VERSION = "png-native/1"
+# No manually unchanged prompt version can mask parser/prompt-source drift.
+PARSER_CONTENT_SHA = sha256_file(Path(__file__).with_name("contracts.py"))
 CRASH_ENV = "VME_CRASH_AT"
 CRASH_POINTS = ("after_inputs_ready", "after_inflight_commit", "after_submit_before_save", "after_raw_response",
                 "mid_semantic_commit", "after_semantic_commit")
@@ -73,7 +76,9 @@ def plan_packets(index: list[dict], start: int, end_inclusive: int, *, film_sha:
         man = [{"i": k, "pts": index[k]["pts"], "sha": index[k]["frame_content_sha256"]} for k in before + tgt + after]
         msha = digest(man)
         pid = digest({"film": film_sha, "s": i, "e": j, "manifest": msha, "pass": pass_id, "cluster": cluster_id,
-                      "model": model_version, "prompt": VISION_PROMPT_VERSION, "transform": TRANSFORM_VERSION})[:32]
+                      "model": model_version, "prompt": VISION_PROMPT_VERSION,
+                      "prompt_sha": VISION_PROMPT_SHA, "parser_sha": PARSER_CONTENT_SHA,
+                      "protocol_sha": PROTOCOL_SHA, "transform": TRANSFORM_VERSION})[:32]
         plans.append(PacketPlan(f"pkt_{pid}", film_sha, pass_id, cluster_id, tgt, before, after, model_version,
                                 VISION_PROMPT_VERSION, TRANSFORM_VERSION, msha, f"idem_{pid}"))
         i = j + 1
@@ -157,6 +162,17 @@ class PacketRunner:
             row = self._row(p.packet_id)
         state = row[0]
         if state == "SEMANTIC_COMMITTED":
+            # Cached output is usable only if the ACTUAL reconstructed
+            # instructions, image manifests and previous packet boundary match.
+            # This check also protects old commit files when a current packet
+            # fingerprint was carried over by an external caller.
+            tgt_, ctx_, _ = self._inputs(p)
+            prior_ = self.prior_boundary(p)
+            current_ = build_vision_request(p.packet_id, tgt_, ctx_, self.questions, prior_)
+            current_["film_sha256"] = p.film_sha256
+            saved_ = read_json(self.packet_dir(p) / "input.json")
+            if not saved_ or (saved_.get("request") or {}).get("request_sha") != current_["request_sha"]:
+                raise Blocked("STALE_SEMANTIC_PACKET_REQUIRES_NEW_ID", p.packet_id)
             return state
         if state in ("BLOCKED_CONSENT", "UNKNOWN_BILLING"):
             return state

@@ -172,6 +172,18 @@ def render_video(scene: dict, assets: dict, out_mp4: str | Path, *, gate=None, r
         raise Blocked("RENDER_ENGINE", r.stderr[-600:])
     verify = ffprobe_verify(out_mp4, scene)
     motion = motion_evidence(out_mp4)
+    # An mp4 merely existing is not a successful render. Keep diagnostic
+    # transport runs distinguishable from an approved integrated film.
+    if not verify.get("ok"):
+        raise Blocked("TECHNICAL_RENDER_FAILED", str(verify.get("problems", [])))
+    if diagnostic_label is None:
+        expectation = (scene.get("motion_contract") or {}).get("expected_independent_motion")
+        if expectation is None:
+            raise Blocked("MOTION_CONTRACT_MISSING", "Integrated scene needs an independently reviewed motion expectation")
+        if expectation is True and not motion.get("ok"):
+            raise Blocked("TECHNICAL_MOTION_FAILED", str(motion.get("verdict")))
+        if expectation is False and not (scene.get("motion_contract") or {}).get("reviewed_static_intent_id"):
+            raise Blocked("UNAPPROVED_STATIC_FILM", "No source-grounded intentional stillness evidence")
     rep = {"label": label, "mp4": str(out_mp4), "mp4_sha256": sha256_file(out_mp4), "ffprobe": verify, "motion": motion,
            "scene_sha": digest(scene), "rendered_at": now_iso(),
            "quality_claim": "TECHNICAL_RENDER_ONLY — not artistic motion quality"}

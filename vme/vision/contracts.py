@@ -120,9 +120,24 @@ def validate_packet_response(response: Any, target_manifest: list[dict], prior_b
             problems.append(f"EMPTY_FRAME_ENTRY:{o['frame_id']}")
         elif is_vague_statement(str(o.get("focal_whole_artwork_state", ""))):
             weak.append(o["frame_id"])
+        # A fluent scene summary without ANY typed source-visible design/event
+        # relation is not a construction-grade observation. An entirely empty
+        # frame should be explicitly described as an observed source fact.
+        relations = o.get("visible_design_relations") or []
+        facts = o.get("source_fact_statements") or []
+        if not relations and not facts:
+            problems.append(f"NO_TYPED_SOURCE_VISUAL_FACTS:{o['frame_id']}")
+        for rel in relations:
+            if (not isinstance(rel, dict) or not isinstance(rel.get("relation"), str)
+                    or is_vague_statement(rel.get("relation", ""))):
+                problems.append(f"UNUSABLE_SOURCE_DESIGN_RELATION:{o['frame_id']}")
     if hash_mismatch:
         return {"ok": False, "status": "QUARANTINED", "problems": problems + [f"IMAGE_HASH_MISMATCH:{hash_mismatch[:5]}"],
                 "weak": weak}
+    # A generic per-frame description is not an artistically verified observation.
+    # Preserve the exact weak ids for targeted reinspection; do not promote them.
+    if weak:
+        problems.append(f"ARTISTIC_FRAME_OBSERVATIONS_INSUFFICIENT:{weak[:10]}")
     texts = [str(o.get("focal_whole_artwork_state", "")) for o in obs if isinstance(o, dict)]
     if len(texts) > 1 and len(set(texts)) == 1 and not all(o.get("no_significant_change_reason") for o in obs[1:]):
         problems.append("GENERIC_UNDIFFERENTIATED_ENTRIES")
@@ -143,7 +158,16 @@ def validate_packet_response(response: Any, target_manifest: list[dict], prior_b
                                         key=lambda x: list(want).index(x["frame_id"]))), None)
         if first is not None:
             carried = set(first.get("persistent_state_ids") or []) | set(first.get("ended_state_ids") or [])
-            lost = [a for a in prior_boundary.get("active_objects", []) if a not in carried]
+            # Boundary objects are documented as structured {id, identity, ...} entries.
+            # Earlier tests used only strings; comparing dicts to a set crashed.
+            prior_ids = []
+            for obj in prior_boundary.get("active_objects", []):
+                oid = obj.get("id") if isinstance(obj, dict) else obj
+                if not isinstance(oid, str) or not oid:
+                    problems.append("BOUNDARY_OBJECT_WITHOUT_STABLE_ID")
+                else:
+                    prior_ids.append(oid)
+            lost = [oid for oid in prior_ids if oid not in carried]
             if lost:
                 problems.append(f"BOUNDARY_IDENTITY_NOT_RECONCILED:{lost[:5]}")
     if problems:

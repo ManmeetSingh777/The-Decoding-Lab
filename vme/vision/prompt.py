@@ -22,6 +22,11 @@ DO NOT: use "vibrant", "dynamic", "professional", "clean vector" as standalone e
 IF visual evidence is inadequate, state UNKNOWN + exact missing image/viewpoint.
 OUTPUT: strict schema, no natural-language summary instead of frame entries."""
 
+# Content-addressed semantics, not a manually-maintained version label.
+# Parser and image-transform digests are separately added by the runner.
+VISION_PROMPT_SHA = digest({"instructions": pass_instructions("P1") + "\n\n" + _TEMPLATE,
+                            "version": VISION_PROMPT_VERSION, "protocol_sha": PROTOCOL_SHA})
+
 
 def build_vision_request(packet_id: str, target_manifest: list[dict], context_manifest: list[dict],
                          active_questions: list[dict], prior_boundary: dict | None, *, source: dict | None = None,
@@ -47,6 +52,7 @@ def build_vision_request(packet_id: str, target_manifest: list[dict], context_ma
                            "next_boundary": True})
     req = {
         "prompt_version": VISION_PROMPT_VERSION,
+        "prompt_content_sha": VISION_PROMPT_SHA,
         "protocol": binding["protocol"],
         "binding": binding,
         "instructions": pass_instructions("P1") + chr(10) * 2 + _TEMPLATE,
