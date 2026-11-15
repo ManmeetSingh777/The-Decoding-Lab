@@ -133,11 +133,22 @@ def test_ablating_an_authored_decision_changes_or_blocks_payload(drill, tmp_path
     (folder / "FROZEN.json").unlink()
     caps = provider_state(ws)["runware"]
 
-    def drop_first(f):
-        d = read_json(f / "decisions.json")
-        atomic_write_json(f / "decisions.json", d[1:])
-    r = causal_mutation_test(folder, brief, caps, recipe_id="main", node_id="n_whole_scene", mutate=drop_first, label="ablate decision")
+    node = next(n for n in read_json(folder / "recipes" / "main.json")["nodes"] if n["id"] == "n_whole_scene")
+    used = node["decisions"][0]
+    unused = next(d["decision_id"] for d in read_json(folder / "decisions.json") if d["decision_id"] not in node["decisions"])
+
+    def drop(did):
+        def m(f):
+            atomic_write_json(f / "decisions.json", [d for d in read_json(f / "decisions.json") if d["decision_id"] != did])
+        return m
+    # production-choice identity means a skill now holds many decisions; ablate one the node actually consumes
+    r = causal_mutation_test(folder, brief, caps, recipe_id="main", node_id="n_whole_scene", mutate=drop(used), label="ablate used decision")
     assert r["request_changed_or_blocked"]
+    folder2 = tmp_path / "skillcopy2"
+    shutil.copytree(s4["skill_folder"], folder2)
+    (folder2 / "FROZEN.json").unlink()
+    r2 = causal_mutation_test(folder2, brief, caps, recipe_id="main", node_id="n_whole_scene", mutate=drop(unused), label="ablate unused decision")
+    assert not r2["request_changed_or_blocked"]        # a decision the node does not use cannot change its request
 
 
 @pytest.mark.req("A04", "A28", "C17", "C18", "C38", path="REAL")
