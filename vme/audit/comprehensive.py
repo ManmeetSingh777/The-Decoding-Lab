@@ -777,7 +777,15 @@ def _assemble(zpath: Path, audit: Path, real_ws: Workspace, extra_spec: list[Pat
 def build(out_zip: Path, *, real_workspace: Path, skip_fresh: bool = False, reuse_evidence: Path | None = None) -> dict:
     out_zip = Path(out_zip).resolve()
     b = ROOT / "audit_build_v3"
-    shutil.rmtree(b, ignore_errors=True)
+
+    def _force(func, path, exc):           # drill source clips are written read-only; clear the flag and retry
+        import stat
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    if b.exists():
+        shutil.rmtree(b, onexc=_force)
+    if b.exists():
+        raise Blocked("AUDIT_BUILD_DIR_NOT_CLEARED", str(b))
     audit, tmp = b / "audit", b / "tmp"
     audit.mkdir(parents=True)
     tmp.mkdir()
