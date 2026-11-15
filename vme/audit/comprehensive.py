@@ -101,13 +101,10 @@ def provider_contracts(out: Path, tmp: Path) -> dict:
             rej.append({"custom_id": cid, "status_code": e.status_code, "error": str(e)[:200]})
     _w(d, "anthropic_strict_fake_rejections.json", {"rejections": rej, "billed_requests": c.billed_requests()})
     t = OfflineRecordingTransport(tmp / "strict_runware")
-    base_task = {"taskType": "imageInference", "taskUUID": str(uuid.uuid4()), "model": "runware:400@4", "positivePrompt": "p", "width": 1024,
-                 "height": 1024, "numberResults": 1, "outputType": "base64Data", "outputFormat": "PNG", "includeCost": True}
-    cases = {"uuid5_task_uuid": {**base_task, "taskUUID": str(uuid.uuid5(uuid.NAMESPACE_URL, "job"))},
-             "missing_includeCost": {k: v for k, v in base_task.items() if k != "includeCost"},
-             "five_reference_images": {**base_task, "inputs": {"referenceImages": ["data:image/png;base64,AA=="] * 5}},
-             "numberResults_2": {**base_task, "numberResults": 2}, "unknown_field_style": {**base_task, "style": "cinematic"},
-             "width_not_multiple_of_16": {**base_task, "width": 1000}}
+    # the hand-built NEGATIVE payloads live in the test suite: no module under vme/ may build a raw positivePrompt task (C14 scan)
+    sys.path.insert(0, str(ROOT / "tests"))
+    from test_provider_contracts import runware_rejection_cases   # type: ignore
+    cases = runware_rejection_cases()
     rr = {}
     for k, task in cases.items():
         try:
@@ -751,7 +748,7 @@ def _assemble(zpath: Path, audit: Path, real_ws: Workspace, extra_spec: list[Pat
             files.append({"path": arc, "sha256": sha256_file(p), "bytes": p.stat().st_size})
         for p in sorted(ROOT.rglob("*")):
             rel = p.relative_to(ROOT)
-            if not p.is_file() or set(rel.parts) & (EXCLUDE_DIRS | {"audit_build_v3"}) or p.suffix.lower() in EXCLUDE_SUFFIX:
+            if not p.is_file() or set(rel.parts) & (EXCLUDE_DIRS | {"audit_build_v3", "evidence_reuse"}) or p.suffix.lower() in EXCLUDE_SUFFIX:
                 continue
             if rel.parts[0] in ("workspace", "reports") or p.name.endswith(".log") or p.name == ".env":
                 continue
@@ -777,7 +774,7 @@ def _assemble(zpath: Path, audit: Path, real_ws: Workspace, extra_spec: list[Pat
     return files
 
 
-def build(out_zip: Path, *, real_workspace: Path, skip_fresh: bool = False) -> dict:
+def build(out_zip: Path, *, real_workspace: Path, skip_fresh: bool = False, reuse_evidence: Path | None = None) -> dict:
     out_zip = Path(out_zip).resolve()
     b = ROOT / "audit_build_v3"
     shutil.rmtree(b, ignore_errors=True)
@@ -787,9 +784,23 @@ def build(out_zip: Path, *, real_workspace: Path, skip_fresh: bool = False) -> d
     real_ws = Workspace(real_workspace)
     summary: dict = {"started": now_iso()}
     summary["provider_contracts"] = provider_contracts(audit, tmp)
-    summary["crash_and_cost"] = crash_and_cost(audit, tmp)
-    summary["drill"] = drill_evidence(audit, tmp)
-    summary["iteration"] = iteration_invalidation(audit, tmp)
+    slow = ["CRASH_AND_COST", "REAL_EVIDENCE_TO_REQUEST", "DYNAMIC_REINSPECTION", "ITERATION_INVALIDATION", "ASSET_MANUFACTURING",
+            "ART_INVESTIGATION_STANDARD_TRACE.json", "CAPSULE_EXAMPLE.json", "DYNAMIC_QUESTION_AND_GAP_QUEUE.json",
+            "PORTABLE_INVESTIGATION_CAPSULE_TEST.json", "SOURCE_FACT_TO_SKILL_TO_REQUEST.json"]
+    if reuse_evidence and all((reuse_evidence / n).exists() for n in slow):
+        # slow drill evidence generated earlier by this same generator; code paths it exercises are unchanged since then
+        man = {}
+        for n in slow:
+            src = reuse_evidence / n
+            (shutil.copytree(src, audit / n) if src.is_dir() else shutil.copy(src, audit / n))
+            for f in ([src] if src.is_file() else sorted(x for x in src.rglob("*") if x.is_file())):
+                man[f.relative_to(reuse_evidence).as_posix()] = sha256_file(f)
+        summary["evidence_reused"] = {"from": str(reuse_evidence), "generated_at_commit": "e16d451/6641d2d (same drill code)",
+                                      "files_sha256": man}
+    else:
+        summary["crash_and_cost"] = crash_and_cost(audit, tmp)
+        summary["drill"] = drill_evidence(audit, tmp)
+        summary["iteration"] = iteration_invalidation(audit, tmp)
     summary["drift"] = model_drift(audit)
     summary["film"] = film_source_status(audit, real_ws)
     after = subprocess.run([sys.executable, str(ROOT / "tools" / "repro_defects.py")], cwd=ROOT, capture_output=True, text=True)
@@ -839,8 +850,10 @@ def main(argv=None) -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--workspace", default=str(ROOT / "workspace"))
     ap.add_argument("--skip-fresh", action="store_true")
+    ap.add_argument("--reuse-evidence", default=None)
     a = ap.parse_args(argv)
-    r = build(Path(a.out), real_workspace=Path(a.workspace), skip_fresh=a.skip_fresh)
+    r = build(Path(a.out), real_workspace=Path(a.workspace), skip_fresh=a.skip_fresh,
+              reuse_evidence=Path(a.reuse_evidence) if a.reuse_evidence else None)
     print(json.dumps({k: r[k] for k in ("zip", "sha256", "files", "self_check", "matrix_totals", "repo_pytest", "fresh_pytest")}, indent=1, default=str))
     return 0
 

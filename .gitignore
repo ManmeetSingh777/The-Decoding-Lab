@@ -9,3 +9,4 @@ render/remotion/node_modules/
 render/remotion/public/
 *.log
 .env
+evidence_reuse/

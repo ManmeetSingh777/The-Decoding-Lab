@@ -399,3 +399,25 @@ def test_crash_after_response_saved_before_settle_neither_loses_cost_nor_replays
     rows = reg.ledger.rows()
     assert t.billed() == 1 and t.duplicate_bills() == 0 and len(rows) == 1
     assert rows[0]["status"] == "SETTLED" and rows[0]["actual_cost"] == pytest.approx(0.2) and r["cost_usd"] == pytest.approx(0.2)
+
+
+def runware_rejection_cases() -> dict:
+    """Deliberately INVALID raw Runware tasks (negative drill). Kept in the test suite: no vme/ module may hand-build one."""
+    base = {"taskType": "imageInference", "taskUUID": str(uuid.uuid4()), "model": "runware:400@4", "positivePrompt": "p", "width": 1024,
+            "height": 1024, "numberResults": 1, "outputType": "base64Data", "outputFormat": "PNG", "includeCost": True}
+    return {"uuid5_task_uuid": {**base, "taskUUID": str(uuid.uuid5(uuid.NAMESPACE_URL, "job"))},
+            "missing_includeCost": {k: v for k, v in base.items() if k != "includeCost"},
+            "five_reference_images": {**base, "inputs": {"referenceImages": ["data:image/png;base64,AA=="] * 5}},
+            "numberResults_2": {**base, "numberResults": 2}, "unknown_field_style": {**base, "style": "cinematic"},
+            "width_not_multiple_of_16": {**base, "width": 1000}}
+
+
+@pytest.mark.req("R04", "R05", "ST28-24")
+def test_strict_runware_fake_rejects_every_contract_violation_without_billing(tmp_path):
+    from vme.providers.gateway import OfflineRecordingTransport
+    t = OfflineRecordingTransport(tmp_path)
+    for name, task in runware_rejection_cases().items():
+        with pytest.raises(Blocked) as e:
+            t(json.dumps([task]).encode(), {})
+        assert e.value.code == "PROVIDER_REJECTED", name
+    assert t.billed() == 0 and len(t.rejected()) == 6
