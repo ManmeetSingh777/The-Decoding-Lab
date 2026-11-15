@@ -99,23 +99,92 @@ class RealLoopRunner:
         self.dir.mkdir(parents=True, exist_ok=True)
 
     # ---- orchestration (same persistence contract as the synthetic runner) ------------------------
+    # ---- dependency-hash stage cache (R12) -----------------------------------------------------------------
+    def _external_inputs(self, st, stage: str) -> dict:
+        """Everything OUTSIDE the previous stage's output that a stage consumes. A change here (or upstream) invalidates
+        exactly this stage and, through its new output hash, only the dependants whose inputs actually change."""
+        def recs(t, pred=lambda r: True):
+            return sorted(digest(r) for r in st.list(t) if pred(r))
+        brief = None
+        a = st.get("ActiveBrief", "anchor")
+        if a:
+            ob = st.get("OriginalBrief", a["brief_id"])
+            brief = ob["brief"] if ob else None
+        lockp = self.ws.state_dir / "SOURCE_LOCK.json"
+        ps = (self.ws.state_dir / "PROVIDER_STATE.json")
+        prov = read_json(ps) if ps.exists() else {}
+        mine = lambda r: r.get("run_id") == self.run_id
+        x: dict = {}
+        if stage == "S0":
+            x = {"lock": digest(read_json(lockp)) if lockp.exists() else None, "roles": recs("SourceLock"),
+                 "vision": prov.get("vision", {}).get("model_id"), "approvals": recs("SelectionApproval"),
+                 "sixth": digest(st.get("SpecialIntroSelection", "REAL"))}
+        elif stage == "S1":
+            x = {"sixth": digest(st.get("SpecialIntroSelection", "REAL")), "vision": prov.get("vision", {}).get("model_id")}
+        elif stage == "S2":
+            x = {"scope": digest((brief or {}).get("scope")),     # revision IDS only: closing a revision must not re-invalidate S2
+                 "revisions": sorted(r["revision_id"] for r in st.list("ArtRevision") if mine(r))}
+        elif stage in ("S3", "S4"):
+            x = {"decisions": sorted(f"{d['decision_id']}@{d['version']}:{d['status']}" for d in st.list("ConditionalVisualDecision")
+                                     if not d.get("synthetic")), "consent": recs("ReferenceExemplarConsent")}
+        elif stage == "S5":
+            x = {"brief": digest({k: (brief or {}).get(k) for k in ("slots", "subjects", "world")}),
+                 "runware": digest({k: prov.get("runware", {}).get(k) for k in ("model_air_id", "user_confirmed_model")})}
+        elif stage == "S6":
+            x = {"art_verdicts": recs("ArtApproval", mine)}
+        elif stage in ("S7", "S8"):
+            x = {"shot_plan": digest((brief or {}).get("shot_plan")), "asset_verdicts": recs("AssetApproval", mine)}
+        elif stage == "S9":
+            x = {"video_reviews": recs("VisualReview", lambda r: mine(r) and r.get("stage") == "video"),
+                 "holdouts": digest(read_json(self.ws.state_dir / "HOLDOUTS.json")) if (self.ws.state_dir / "HOLDOUTS.json").exists() else None}
+        return x
+
+    # the upstream fields a stage actually consumes (volatile counters/version labels in an upstream output never invalidate)
+    UPSTREAM_FIELDS = {"S3": ("decisions",), "S4": ("decisions",), "S5": ("skill_hash",), "S6": None, "S7": ("art_approval_id",)}
+
+    def _input_key(self, st, stage: str) -> dict:
+        i = STAGES.index(stage)
+        up = None
+        if i:
+            t = st.get("LoopTransition", f"{self.run_id}:{STAGES[i - 1]}")
+            fields = self.UPSTREAM_FIELDS.get(stage)
+            if t and fields and t.get("status") == "COMPLETED":
+                up = digest({f: (t.get("outputs") or {}).get(f) for f in fields})
+            else:
+                up = t.get("output_sha") if t else None
+        ext = self._external_inputs(st, stage)
+        return {"upstream_output_sha": up, "external": ext, "key": digest({"up": up, "ext": ext})}
+
     def run(self, *, until: str = "S9") -> dict:
         st = self.ws.store()
+        self._invalidated: set = set()
         try:
             done = {t["stage"]: t for t in st.list("LoopTransition") if t["run_id"] == self.run_id and t["status"] == "COMPLETED"}
             trace = []
             for s in STAGES:
-                if s in done:
-                    trace.append({"stage": s, "status": "COMPLETED", "resumed_from_store": True})
+                ik = self._input_key(st, s)
+                if s in done and done[s].get("input_key") == ik["key"]:
+                    trace.append({"stage": s, "status": "COMPLETED", "resumed_from_store": True, "input_key": ik["key"][:16]})
                     if s == until:
                         break
                     continue
+                if s in done:
+                    old = done[s].get("input_key_detail") or {}
+                    changed = sorted(k for k in set(old.get("external", {})) | set(ik["external"])
+                                     if old.get("external", {}).get(k) != ik["external"].get(k))
+                    if old.get("upstream_output_sha") != ik["upstream_output_sha"]:
+                        changed.append("upstream_output")
+                    self._invalidated.add(s)
+                    st.put("StageInvalidation", f"{self.run_id}:{s}:{ik['key'][:12]}", {"run_id": self.run_id, "stage": s,
+                                                                                          "previous_key": done[s].get("input_key"),
+                                                                                          "new_key": ik["key"], "changed_inputs": changed,
+                                                                                          "at": now_iso()})
                 try:
                     status, out = getattr(self, f"_{s.lower()}")(st)
                 except Blocked as b:
                     status, out = "STOPPED", {"stop_reason": b.code, "blocked": b.to_dict()}
-                self._commit(st, s, status, out)
-                trace.append({"stage": s, "status": status, "reason": out.get("stop_reason")})
+                self._commit(st, s, status, out, ik)
+                trace.append({"stage": s, "status": status, "reason": out.get("stop_reason"), "rerun_due_to_invalidation": s in self._invalidated})
                 if status != "COMPLETED":
                     return {"run_id": self.run_id, "stopped_at": s, "reason": out.get("stop_reason"), "trace": trace}
                 if s == until:
@@ -124,10 +193,12 @@ class RealLoopRunner:
         finally:
             st.close()
 
-    def _commit(self, st, stage, status, outputs):
+    def _commit(self, st, stage, status, outputs, ik=None):
         st.put("LoopTransition", f"{self.run_id}:{stage}", {"run_id": self.run_id, "stage": stage, "status": status,
                                                               "consumer": CONSUMERS[stage], "outputs": outputs, "mode": "REAL",
                                                               "evidence_origin": self.p.evidence_origin,
+                                                              "input_key": (ik or {}).get("key"), "input_key_detail": ik,
+                                                              "output_sha": digest(outputs),
                                                               "stop_reason": outputs.get("stop_reason"), "at": now_iso()})
         self.ws.update_state(current_stage=stage, last_completed_unit=f"{self.run_id}:{stage}:{status}")
         maybe_crash(f"real_after_{stage}")
@@ -518,11 +589,23 @@ class RealLoopRunner:
                 rev["review"]["gaps"] = rev["review"]["gaps"] + [g["gap_id"] for g in rev["gap_details"] if g["gap_id"].startswith("GP_")]
             st.put("CoverageReview", self.run_id, rev)
             st.put("VisualModelCoverageLedger", self.run_id, L)
-            if rev["review"]["image_trial_ready"]:
+            # a decision reopened by a human art rejection is re-investigated FIRST and keeps its identity, even if other
+            # decisions still cover its choices — rejection must revise the responsible choice, not silently drop it (R12/ST28-21)
+            reopened = [d for d in decs if str(d.get("research_only_reason", "")).startswith("REOPENED_BY_HUMAN")]
+            forced = reopened[0] if reopened else None
+            if forced is None and rev["review"]["image_trial_ready"]:
+                for r_ in st.list("ArtRevision"):
+                    if r_["run_id"] == self.run_id and r_["status"] == "OPEN":
+                        st.put("ArtRevision", r_["revision_id"], {**r_, "status": "CLOSED", "closed_at": now_iso()})
                 st.put("RealInvestigationTrace", self.run_id, trace)
                 return "COMPLETED", {"coverage_state": rev["review"]["state"], "questions": len(trace["steps"]),
                                      "decisions": [d["decision_id"] for d in decs if d["status"] != "RESEARCH_ONLY"],
                                      "resolved_gaps": sorted({s["gap_signature"] for s in trace["steps"] if s.get("decision_changed")})}
+            if forced is not None:
+                rev["controlling_gap"] = {"gap_id": f"GR_{forced['decision_id']}", "kind": "MISSING_DECISION", "salience": "HIGH",
+                                          "what": "human-rejected original art: " + "; ".join(x.get("symptom", "") for x in forced.get("reopened_defects", [])),
+                                          "dimensions": forced["dimension_tags"], "choice_id": (forced.get("owned_choice_ids") or [None])[0],
+                                          "reopened_decision_id": forced["decision_id"], "conditions": {}}
             g = rev["controlling_gap"]
             sig = f"{g['kind']}|{'+'.join(g['dimensions'])}|{g.get('joint_id') or g.get('choice_id')}"
             st.put("GapQueue", self.run_id, {"controlling_gap": g, "queued": [x for x in rev["gap_details"] if x["gap_id"] != g["gap_id"]],
@@ -567,6 +650,12 @@ class RealLoopRunner:
             phenomenon = (st.get("VisualPhenomenon", g["phenomenon_id"]) or {}).get("phenomenon") if g.get("phenomenon_id") else owned_key
             did = production_choice_id(owned_key, phenomenon or owned_key)
             owned = sorted({owned_key} | {r["choice_id"] for r in req})
+            if forced is not None:
+                did, phenomenon = forced["decision_id"], forced.get("phenomenon") or forced["decision_id"]
+                owned = list(forced.get("owned_choice_ids") or [owned_key])
+                req = [r for r in self._required_branches(plan, dims) if r["choice_id"] in owned] or \
+                      [{"conditions": b["when"], "operation_ids": b["operation_node_ids"], "choice_id": owned[0]} for b in forced["branches"]
+                       if b["operation_node_ids"]]
             refs, contrast = self._pick_witnesses(st, dims, phenomenon_id=g.get("phenomenon_id"))
             if not refs:
                 return "STOPPED", {"stop_reason": "BLOCKER_NO_WITNESS_FOR_DIMENSIONS", "dimensions": dims}
@@ -596,13 +685,31 @@ class RealLoopRunner:
                 _, idx, cache = self._film(w["film_sha256"])
                 fr = cache.frame(w["frame_start"])
                 imgs.append((f"WITNESS {wid} frame={w['film_sha256'][:16]}:{w['frame_start']} pts_time={w.get('pts_time')}", fr.png_bytes, fr.width, fr.height))
+            prev_d = st.get("ConditionalVisualDecision", did) or {}
+            defects = prev_d.get("reopened_defects") if str(prev_d.get("research_only_reason", "")).startswith("REOPENED_BY_HUMAN") else None
+            if defects and q.owner_stage != "STYLE_CONDITIONS":
+                q.owner_stage = "STYLE_CONDITIONS"          # the source evidence exists; the CONDITIONAL ACTION failed in original art
             payload = {"question": q.to_dict(), "dimensions": dims, "required_branches": req if q.owner_stage == "STYLE_CONDITIONS" else [],
+                       "human_art_defects": defects or [],
                        "allowed_operations": sorted({o for r in req for o in r["operation_ids"]}) or ["op.whole_scene"]}
             task = custom_id_for("question_answer", {"question_sha": digest(q.question_text), "witnesses": q.planned_witness_or_input_ids,
                                                      "image_labels": [i[0] for i in imgs], "dims": dims, "model": vis.caps.model_id,
                                                      "system_sha": digest(QA_SYSTEM)})
             ans = vis.request_json(task, "question_answer", QA_SYSTEM, json.dumps(payload), imgs,
                                    source_shas=sorted({wits[w]["film_sha256"] for w in (q.observed_contrast_with_witness_ids or refs)[:6]}))
+
+            maybe_crash("real_s2_after_answer_before_decision")      # raw answer is journaled; the decision is not yet published
+            if q.owner_stage == "STYLE_CONDITIONS":
+                from ..vision.protocol import assess_sufficiency
+                asm = assess_sufficiency(ans, producing_operator=payload["allowed_operations"], known_witness_ids=set(wits))
+                if asm["verdict"] != "SUFFICIENT_FOR_PRODUCING_CHOICE":
+                    st.put("InsufficientAnswer", task, {"task": task, "question_id": q.question_id, "decision_id": did, "assessment": asm,
+                                                        "receipt": ans.get("receipt"), "at": now_iso()})
+                    trace["steps"].append({"question_id": q.question_id, "stage": q.owner_stage, "gap": g["gap_id"], "gap_signature": sig,
+                                           "decision_id": did, "task": task, "answer_status": "INSUFFICIENT_FOR_PRODUCING_CHOICE",
+                                           "assessment": asm, "decision_changed": False})
+                    st.put("RealInvestigationTrace", self.run_id, trace)
+                    continue
 
             def writer(qq, aa, _dims=dims, _req=req, _did=did, _owned=owned, _ph=phenomenon):
                 return author_decision(st, qq.to_dict(), aa, dims=_dims, registered_ops=registered(), required_branches=_req,
@@ -724,7 +831,8 @@ class RealLoopRunner:
             near = [w for w in st.list("Witness") if w["film_sha256"] == ph["film_sha256"] and abs(w["frame_start"] - ph["frame_index"]) <= 1]
             ws = near + [w for w in ws if w not in near]
         ws.sort(key=lambda w: (-len(set(w["dimensions"]) & set(dims)), w["witness_id"]))
-        refs, films = [], set()
+        refs: list[str] = []
+        films: set[str] = set()
         for w in ws:
             if w["film_sha256"] not in films and w["evidence_kind"] in ("FULL_FRAME", "NATIVE_CROP") and len(refs) < 3:
                 refs.append(w["witness_id"])
@@ -762,10 +870,12 @@ class RealLoopRunner:
               **{k: {"width": 1024, "height": 1024, "format": "PNG", "asset_kind": "CHARACTER"} for k in
                  ("op.canonical_character", "op.face_view_state", "op.hand_prop_contact", "op.region_edit")}}
         cur = current_skill(root)
-        if cur and (Path(cur["folder"]) / "FROZEN.json").exists() and cur.get("decisions_sha") == digest(sorted(d["decision_id"] + str(d["version"]) for d in decs)):
+        if cur and Path(cur["folder"]).exists() and cur.get("decisions_sha") == digest(sorted(d["decision_id"] + str(d["version"]) for d in decs)):
             from ..skills.skill import skill_hash
             folder = Path(cur["folder"])
-            res = {"folder": str(folder), "skill_hash": skill_hash(folder), "derivations": "FROZEN (unchanged)"}
+            res = {"folder": str(folder), "skill_hash": skill_hash(folder), "derivations": "UNCHANGED (same decisions → same immutable version)",
+                   "references": None}
+            version = cur.get("version") or version
         else:
             res = publish_skill_version(root, decs, skill_id=f"real-{self.run_id.lower()}", version=version,
                                         evidence_origin=self.p.evidence_origin, output_contracts=oc,
@@ -848,11 +958,16 @@ class RealLoopRunner:
                                                   "label": r["label"], "task_uuid": r["task_uuid"]})
             g, snap = self._gateway(st)
         gk = GateKeeper(st)
-        if gk.state(self.run_id)["state"] == "AWAITING_PROVIDER_OR_SOURCE":
+        if "S5" in getattr(self, "_invalidated", set()):
+            gk.reopen(self.run_id, "ART", reason="S5 inputs changed (new skill/brief/provider) — previous art approvals no longer apply")
+        if gk.state(self.run_id)["state"] in ("AWAITING_PROVIDER_OR_SOURCE", "ARTWORK_REJECTED"):
             gk.transition(self.run_id, "ART_GENERATING", reason="S5", synthetic=self.p.evidence_origin != "REAL_VLM")
         from ..skills.skill import load_skill
         have = {n["id"] for n in load_skill(s4["skill_folder"])["recipes"]["main"]["nodes"]}
-        nodes = [n for n in ("n_whole_scene", "n_canonical_character") if n in have]
+        nodes = [n for n in ("n_world_plate", "n_whole_scene", "n_canonical_character") if n in have]
+        if "n_world_plate" not in have:
+            return "STOPPED", {"stop_reason": "WORLD_PLATE_ROUTE_MISSING",
+                               "note": "a clean world plate is required so a separate actor is never duplicated over a scene containing it (R18)"}
         res = execute(s4["skill_folder"], brief, gateway=g, caps=snap, node_ids=nodes, pinned_skill_hash=s4["skill_hash"], store=st)
         if gk.state(self.run_id)["state"] == "ART_GENERATING":
             gk.transition(self.run_id, "AWAITING_ARTWORK_REVIEW", reason="full-resolution stills ready")
@@ -871,10 +986,41 @@ class RealLoopRunner:
             return "COMPLETED", {"art_approval_id": s["required_art_approval_ids"][0]}
         if s["state"] == "ARTWORK_REJECTED":
             nq = self._question_from_human_review(st, "art")
-            return "STOPPED", {"stop_reason": "ARTWORK_REJECTED", "next_question": nq}
+            rev = self._open_revision(st)
+            return "STOPPED", {"stop_reason": "ARTWORK_REJECTED_REVISION_OPEN" if rev and rev["reopened_decisions"] else "ARTWORK_REJECTED",
+                               "revision": rev, "next_question": nq,
+                               "human_next_step": None if rev and rev["reopened_decisions"] else
+                               "attribute each defect to a decision_id so the responsible production choice can be reopened"}
         s5 = self._out(st, "S5")
         return "STOPPED", {"stop_reason": "AWAITING_ARTWORK_REVIEW", "images": [v["image"] for v in s5.values()],
                            "human_next_step": f"vme review serve --run {self.run_id}  (or vme art approve|reject)"}
+
+    def _open_revision(self, st) -> dict | None:
+        """Human art rejection → structured defects → the attributed production-choice decisions are REOPENED (new version,
+        old evidence and rejected images kept) → S2..S5 inputs change → a NEW skill version and a DIFFERENT request (R12/ST28-21)."""
+        rej = [a for a in st.list("ArtApproval") if a["run_id"] == self.run_id and a["verdict"] == "REJECTED"]
+        if not rej:
+            return None
+        a = rej[-1]
+        rid = f"{self.run_id}:{a['approval_id']}"
+        ex = st.get("ArtRevision", rid)
+        if ex:
+            return ex
+        reopened = []
+        for d in a.get("defects") or []:
+            did = d.get("decision_id")
+            dec = st.get("ConditionalVisualDecision", did) if did else None
+            if not dec:
+                continue
+            st.put("ConditionalVisualDecision", did, {**dec, "version": dec["version"] + 1, "status": "RESEARCH_ONLY",
+                                                      "research_only_reason": f"REOPENED_BY_HUMAN_ART_REJECTION:{a['approval_id']}",
+                                                      "reopened_defects": [x for x in a["defects"] if x.get("decision_id") == did],
+                                                      "claim_state": "UNRESOLVED", "rejected_image_hashes": a["image_hashes"]})
+            reopened.append(did)
+        rev = {"revision_id": rid, "run_id": self.run_id, "approval_id": a["approval_id"], "defects": a.get("defects") or [],
+               "rejected_image_hashes": a["image_hashes"], "reopened_decisions": sorted(set(reopened)), "status": "OPEN", "at": now_iso()}
+        st.put("ArtRevision", rid, rev)
+        return rev
 
     def _question_from_human_review(self, st, stage: str) -> dict | None:
         from ..investigation.controller import ActiveArtProblem, LoopController, ProblemContext
@@ -893,78 +1039,125 @@ class RealLoopRunner:
         lc.observe_new_output(p, {"output_id": revs[-1]["review_id"], "findings": revs[-1]["findings"]})
         return lc.step_question(p, gap_id=f"human:{revs[-1]['review_id']}").to_dict()
 
-    # ---- S7: identity-conditioned states, WHOLE_STATE_SWAP pack, human asset verdict --------------------
+    # ---- S7: every planned asset demand → real operator → verified artifact → consumer, or a named blocker (R17/R19) -----
+    STATE_NODE = {"view": ("n_face_view_state", lambda v: {"view": v}), "grip": ("n_hand_prop_contact", lambda v: {"action": "grip"}),
+                  "expr": ("n_face_view_state", None)}
+
     def _s7(self, st):
         from ..review.approvals import GateKeeper
         from ..artwork.character import derive_animation_demand, character_construction_plan
         from ..artwork.raster import decode_raster
         from ..skills.runtime import execute
-        from ..util import sha256_file
+        from ..skills.skill import load_skill
+        from ..util import sha256_file, atomic_write_json
         gk = GateKeeper(st)
         s = gk.state(self.run_id)
         prev = (st.get("LoopTransition", f"{self.run_id}:S7") or {}).get("outputs", {})
-        if s["state"] in ("ASSETS_APPROVED", "VIDEO_RENDERING", "AWAITING_VIDEO_REVIEW") and s["required_asset_approval_ids"]:
+        stale = "S7" in getattr(self, "_invalidated", set()) or prev.get("shot_plan_sha") != digest(self._brief(st).get("shot_plan"))
+        if not stale and s["state"] in ("ASSETS_APPROVED", "VIDEO_RENDERING", "AWAITING_VIDEO_REVIEW") and s["required_asset_approval_ids"]:
             return "COMPLETED", {**prev, "asset_approval_id": s["required_asset_approval_ids"][0]}
-        if s["state"] == "AWAITING_ASSET_REVIEW":
+        if not stale and s["state"] == "AWAITING_ASSET_REVIEW":
             return "STOPPED", {**prev, "stop_reason": "AWAITING_ASSET_REVIEW"}
+        if stale:
+            self._invalidated.add("S7") if hasattr(self, "_invalidated") else None
         if s["state"] == "ASSETS_REJECTED":
             return "STOPPED", {"stop_reason": "ASSETS_REJECTED", "next_question": self._question_from_human_review(st, "asset")}
         s4, s5 = self._out(st, "S4"), self._out(st, "S5")
         brief = self._brief(st)
-        actor = next(x for x in brief["scope"]["subjects"] if x.get("kind") == "character")
-        demand = derive_animation_demand(actor["id"], brief["shot_plan"].get("actions", []))
-        plan = character_construction_plan(actor["id"], brief["brief_id"], s4["skill_hash"], demand)
-        st.put("CharacterConstructionPlan", f"{self.run_id}:{actor['id']}", plan)
+        sp = brief["shot_plan"]
+        actors = [x for x in brief["scope"]["subjects"] if x.get("kind") == "character"]
+        if "S7" in getattr(self, "_invalidated", set()) and gk.state(self.run_id)["state"] in (
+                "AWAITING_ASSET_REVIEW", "ASSETS_APPROVED", "AWAITING_VIDEO_REVIEW", "ASSETS_REJECTED"):
+            gk.reopen(self.run_id, "ASSET", reason="S7 inputs changed (shot plan / art) — previous asset approval no longer applies")
         if s["state"] == "ARTWORK_APPROVED":
             gk.transition(self.run_id, "ASSET_PREPARING", reason="S7")
-        canon = s5["n_canonical_character"]
-        ident = {f"{actor['id']}:canonical": {"path": canon["image"], "sha256": canon["sha"], "approved": True}}
-        b = dict(brief)
-        b["subjects"] = [dict(x, identity_asset_id=f"{actor['id']}:canonical") if x["id"] == actor["id"] else x for x in brief["subjects"]]
         g, snap = self._gateway(st)
-        states, not_made = {}, []
-        for step in plan["generation_sequence"]:
-            if step["kind"] != "CHARACTER_STATE":
-                continue
-            if step["step"].startswith("view:"):
-                nid, over = "n_face_view_state", {"view": step["step"].split(":", 1)[1]}
-            elif step["step"].startswith("grip:"):
-                nid, over = "n_hand_prop_contact", {"action": "grip"}
-            else:
-                not_made.append({"state": step["step"], "reason": "NO_DECISION_CONDITION_FOR_EXPRESSION (open targeted question)"})
-                continue
-            try:
-                r = execute(s4["skill_folder"], b, gateway=g, caps=snap, node_ids=[nid], pinned_skill_hash=s4["skill_hash"],
-                            identity_assets=ident, slot_overrides={nid: over}, store=st)[nid]
-            except Blocked as e:
-                not_made.append({"state": step["step"], "reason": e.code, "ticket": e.data.get("ticket")})
-                continue
-            states[step["step"]] = {"path": r["image"], "sha256": r["sha"], "identity_reference_sha256": canon["sha"],
-                                    "reference_shas": r["reference_shas"], "clause_ids": r["clause_ids"]}
-        cra = decode_raster(Path(canon["image"]).read_bytes(), asset_id="canon", owner=actor["id"], skill_version=s4["skill_hash"])
-        problems = []
-        for k, v in states.items():
-            ra = decode_raster(Path(v["path"]).read_bytes(), asset_id=k, owner=actor["id"], skill_version=s4["skill_hash"])
-            if (ra.width, ra.height) != (cra.width, cra.height):
-                problems.append(f"STATE_CANVAS_MISMATCH:{k}")
-            if canon["sha"] not in v["reference_shas"]:
-                problems.append(f"STATE_NOT_CONDITIONED_ON_CANONICAL:{k}")
+        have = {n["id"] for n in load_skill(s4["skill_folder"])["recipes"]["main"]["nodes"]}
+        canon = s5["n_canonical_character"]
+        cra = decode_raster(Path(canon["image"]).read_bytes(), asset_id="canon", owner=actors[0]["id"], skill_version=s4["skill_hash"])
+        demands, assets, blocked = [], {}, []
+        consumers = {}
+        for ev in sp.get("events", []):
+            consumers.setdefault(ev["state"], []).append(ev.get("event_id") or f"{ev['from']}-{ev['to']}")
+
+        def contract(path, kind, actor, state, extra=None):
+            ra = decode_raster(Path(path).read_bytes(), asset_id=state, owner=actor, skill_version=s4["skill_hash"])
+            return {"path": path, "sha256": ra.sha256, "width": ra.width, "height": ra.height, "pixel_mode": ra.pixel_mode,
+                    "alpha": "NONOPAQUE_ALPHA" if ra.has_nonopaque_alpha else "OPAQUE_NO_MASK",
+                    "coordinate_frame": {"origin": "top-left pixel of this canvas", "anchor": "bottom-centre of canvas", "units": "px"},
+                    "kind": kind, "actor_id": actor, "state": state, "identity_source_sha256": canon["sha"], "art_skill_hash": s4["skill_hash"],
+                    "depth": (extra or {}).get("depth", 1), "consumers": consumers.get(state, []), **(extra or {})}
+        assets["world_plate"] = contract(s5["n_world_plate"]["image"], "WORLD_PLATE", None, "world_plate",
+                                         {"depth": 0, "contains_actor": False, "consumers": ["background"]})
+        for actor in actors:
+            demand = derive_animation_demand(actor["id"], sp.get("actions", []))
+            plan = character_construction_plan(actor["id"], brief["brief_id"], s4["skill_hash"], demand)
+            st.put("CharacterConstructionPlan", f"{self.run_id}:{actor['id']}", plan)
+            ident = {f"{actor['id']}:canonical": {"path": canon["image"], "sha256": canon["sha"], "approved": True}}
+            b = dict(brief)
+            b["subjects"] = [dict(x, identity_asset_id=f"{actor['id']}:canonical") if x["id"] == actor["id"] else x for x in brief["subjects"]]
+            for step in plan["generation_sequence"]:
+                d = {"step": step["step"], "operator": step["operator"], "kind": step["kind"], "actor": actor["id"]}
+                demands.append(d)
+                if step["kind"] == "CHARACTER_CANONICAL":
+                    assets[step["step"]] = contract(canon["image"], "CHARACTER_CANONICAL", actor["id"], "canonical")
+                    d["status"] = "PRODUCED_IN_S5"
+                    continue
+                if step["kind"] in ("LAYER", "CLEAN_PLATE"):
+                    # no verified segmentation / hidden-surface / clean-plate capability: block, never fake layers (R19)
+                    d.update(status="BLOCKED_ROUTE_NOT_IMPLEMENTED",
+                             reason=f"{step['operator']} needs a verified mask/segmentation route; WHOLE_STATE_SWAP cannot provide it")
+                    blocked.append(d)
+                    continue
+                fam, val = step["step"].split(":", 1)
+                nid, over = self.STATE_NODE.get(fam, (None, None))
+                if nid is None or nid not in have or over is None:
+                    d.update(status="BLOCKED_NO_DECISION_OR_OPERATOR", reason=f"no evidenced decision/condition produces state {step['step']}",
+                             ticket={"question": f"Which source-evidenced decision produces the {step['step']} drawing state for "
+                                                 f"{actor['id']} from the approved canonical art?", "operator": step["operator"]})
+                    blocked.append(d)
+                    continue
+                try:
+                    r = execute(s4["skill_folder"], b, gateway=g, caps=snap, node_ids=[nid], pinned_skill_hash=s4["skill_hash"],
+                                identity_assets=ident, slot_overrides={nid: over(val)}, store=st)[nid]
+                except Blocked as e:
+                    d.update(status="BLOCKED_PROVIDER_OR_DECISION", reason=e.code, ticket=e.data.get("ticket"))
+                    blocked.append(d)
+                    continue
+                c = contract(r["image"], "CHARACTER_STATE", actor["id"], step["step"],
+                             {"reference_shas": r["reference_shas"], "clause_ids": r["clause_ids"],
+                              "contact": {"prop": step.get("prop_id"), "hand_side": step.get("hand_side")} if fam == "grip" else None,
+                              "view": val if fam == "view" else None})
+                if (c["width"], c["height"]) != (cra.width, cra.height):
+                    d.update(status="BLOCKED_STATE_CANVAS_MISMATCH")
+                    blocked.append(d)
+                    continue
+                if canon["sha"] not in r["reference_shas"]:
+                    d.update(status="BLOCKED_NOT_CONDITIONED_ON_CANONICAL")
+                    blocked.append(d)
+                    continue
+                assets[step["step"]] = c
+                d.update(status="PRODUCED", artifact_sha256=c["sha256"], consumers=c["consumers"])
         pack = {"method": "WHOLE_STATE_SWAP", "method_reason": "no verified segmentation/inpainting capability; whole drawings swap, no pretend layers",
-                "canonical": {"path": canon["image"], "sha256": canon["sha"], "width": cra.width, "height": cra.height},
-                "background": s5["n_whole_scene"]["image"], "states": states, "not_generated": not_made, "problems": problems}
+                "method_limits": "does NOT provide separated arms, clean plates, IK, hidden surfaces or part continuity",
+                "world_plate": assets["world_plate"], "canonical": assets.get("canonical"),
+                "states": {k: v for k, v in assets.items() if v["kind"] == "CHARACTER_STATE"}, "demands": demands, "blocked": blocked,
+                "art_direction_still": s5.get("n_whole_scene", {}).get("image"),
+                "art_direction_still_use": "human art review only; never a render background (it already contains the actor)"}
         pack_path = self.dir / "asset_pack.json"
-        from ..util import atomic_write_json
         atomic_write_json(pack_path, pack)
-        if gk.state(self.run_id)["state"] == "ASSET_PREPARING":
-            gk.transition(self.run_id, "AWAITING_ASSET_REVIEW", reason="WHOLE_STATE_SWAP pack ready")
-        files = [canon["image"], s5["n_whole_scene"]["image"]] + [v["path"] for v in states.values()]
-        out = {"pack": str(pack_path), "states": list(states), "not_generated": not_made, "problems": problems,
+        files = [v["path"] for v in assets.values()]
+        out = {"pack": str(pack_path), "states": sorted(pack["states"]), "demands": demands, "blocked": blocked,
+               "shot_plan_sha": digest(sp),
                "files": files, "file_shas": [sha256_file(f) for f in files]}
-        if problems:
-            return "STOPPED", {**out, "stop_reason": "ASSET_PACK_DEFECTS"}
+        if blocked:
+            return "STOPPED", {**out, "stop_reason": "ASSET_DEMAND_BLOCKED",
+                               "exact_blockers": [{"step": x["step"], "status": x["status"], "reason": x.get("reason")} for x in blocked]}
+        if gk.state(self.run_id)["state"] == "ASSET_PREPARING":
+            gk.transition(self.run_id, "AWAITING_ASSET_REVIEW", reason="every planned demand produced (WHOLE_STATE_SWAP)")
         return "STOPPED", {**out, "stop_reason": "AWAITING_ASSET_REVIEW"}
 
-    # ---- S8: render approved art + states ----------------------------------------------------------
+    # ---- S8: render the DIRECTED shot plan from approved assets only (R18/R20) ------------------------------------
     def _s8(self, st):
         from ..render.renderer import render_video
         from ..review.approvals import GateKeeper
@@ -977,25 +1170,48 @@ class RealLoopRunner:
         brief = self._brief(st)
         sp = brief["shot_plan"]
         R = self.cfg.render
-        W, H, fps, n = R["width"], R["height"], sp.get("fps", R["fps"]), sp.get("frames", 60)
-        ch = int(H * 0.8)
-        actor = {"id": "actor", "src": "canonical.png", "x": int(W * 0.55), "y": H - ch, "w": ch, "h": ch, "z": 1,
-                 "keyframes": sp.get("actor_keyframes") or [{"frame": 0, "x": int(W * 0.55)}, {"frame": n - 1, "x": int(W * 0.5)}], "states": []}
-        assets = {"background.png": pack["background"], "canonical.png": pack["canonical"]["path"]}
-        for ev in sp.get("events", []):
-            st_id = ev["state"]
-            if st_id in pack["states"]:
-                name = f"state_{len(assets)}.png"
-                assets[name] = pack["states"][st_id]["path"]
-                actor["states"].append({"from_frame": ev["from"], "to_frame": ev["to"], "src": name})
+        W, H, fps, n = R["width"], R["height"], sp.get("fps", R["fps"]), sp.get("frames")
+        problems = []
+        if not n:
+            problems.append("shot_plan.frames missing")
+        if not sp.get("actors"):
+            problems.append("shot_plan.actors missing: every actor's placement/size/depth/keyframes must be directed (no default x=55%)")
+        if problems:
+            return "STOPPED", {"stop_reason": "SHOT_PLAN_NOT_DIRECTED", "problems": problems}
+        scale = W / float(sp.get("plan_width", W))
+        assets = {"world_plate.png": pack["world_plate"]["path"]}
+        layers = [{"id": "world", "src": "world_plate.png", "x": 0, "y": 0, "w": W, "h": H, "z": 0}]
+        event_trace = []
+        for a in sp["actors"]:
+            canon = pack["canonical"]
+            if canon is None or canon["actor_id"] != a["id"]:
+                return "STOPPED", {"stop_reason": "ACTOR_ASSET_NOT_APPROVED", "actor": a["id"]}
+            name = f"{a['id']}_canonical.png"
+            assets[name] = canon["path"]
+            lay = {"id": a["id"], "src": name, "x": int(a["x"] * scale), "y": int(a["y"] * scale), "w": int(a["w"] * scale),
+                   "h": int(a["h"] * scale), "z": int(a["z"]), "keyframes": [dict(k, x=int(k["x"] * scale)) if "x" in k else k for k in a.get("keyframes", [])],
+                   "states": []}
+            for ev in [e for e in sp.get("events", []) if e.get("actor", a["id"]) == a["id"]]:
+                stt = pack["states"].get(ev["state"])
+                if stt is None:
+                    return "STOPPED", {"stop_reason": "EVENT_STATE_NOT_PRODUCED", "event": ev,
+                                       "note": "a missing drawing state is never replaced by a transform of another drawing"}
+                sname = f"{a['id']}_{ev['state'].replace(':', '_')}.png"
+                assets[sname] = stt["path"]
+                lay["states"].append({"from_frame": ev["from"], "to_frame": ev["to"], "src": sname})
+                event_trace.append({"event": ev.get("event_id"), "actor": a["id"], "state": ev["state"], "asset_sha256": stt["sha256"],
+                                    "frames": [ev["from"], ev["to"]]})
+            layers.append(lay)
         scene = {"width": W, "height": H, "fps": fps, "durationInFrames": n, "background": "#000000",
                  "camera": {"keyframes": sp.get("camera") or [{"frame": 0, "x": 0, "y": 0, "scale": 1.0}]},
-                 "layers": [{"id": "bg", "src": "background.png", "x": 0, "y": 0, "w": W, "h": H, "z": 0}, actor]}
+                 "camera_source": "shot_plan.camera" if sp.get("camera") else "STATIC (none directed; no default pan)",
+                 "layers": sorted(layers, key=lambda l: l["z"])}
         rep = render_video(scene, assets, self.dir / "integrated.mp4", gate=gk, run_id=self.run_id)
-        st.put("RenderReport", self.run_id, rep)
-        out = {"mp4": rep["mp4"], "mp4_sha256": rep["mp4_sha256"], "motion": rep["motion"]["verdict"], "ffprobe_ok": rep["ffprobe"]["ok"],
-               "state_swaps": len(actor["states"]), "label": rep["quality_claim"]}
-        return "COMPLETED", out
+        st.put("RenderReport", self.run_id, {**rep, "event_trace": event_trace})
+        return "COMPLETED", {"mp4": rep["mp4"], "mp4_sha256": rep["mp4_sha256"], "motion": rep["motion"]["verdict"],
+                             "ffprobe_ok": rep["ffprobe"]["ok"], "state_swaps": len(event_trace), "event_trace": event_trace,
+                             "background": "WORLD_PLATE (no actor)", "actors": [a["id"] for a in sp["actors"]],
+                             "label": rep["quality_claim"], "animation_claim": "PROFESSIONAL_ANIMATION_UNPROVEN (WHOLE_STATE_SWAP)"}
 
     # ---- S9: human video review, frozen-skill transfer on a sealed unseen brief, next question --------------
     def _s9(self, st):
@@ -1016,8 +1232,12 @@ class RealLoopRunner:
         g, snap = self._gateway(st)
         r = execute(s4["skill_folder"], brief, gateway=g, caps=snap, node_ids=["n_whole_scene"], pinned_skill_hash=s4["skill_hash"], store=st)
         rec = hr.record_result(sealed[0], skill_hash_used=s4["skill_hash"])
-        st.put("TransferRecord", self.run_id, {"holdout": sealed[0], "status": rec["status"], "output": r["n_whole_scene"]["sha"], "next_question": nq})
-        return "COMPLETED", {"transfer": "TRANSFER_PENDING_AWAITING_REVIEW", "holdout": sealed[0], "output_sha": r["n_whole_scene"]["sha"],
+        st.put("TransferRecord", self.run_id, {"holdout": sealed[0], "status": rec["status"], "output": r["n_whole_scene"]["sha"], "next_question": nq,
+                                               "still_transfer": "STILL_TRANSFER_PENDING_AWAITING_REVIEW",
+                                               "animated_transfer": "NOT_ATTEMPTED (needs a frozen-skill animated holdout + human video review)",
+                                               "scope_note": "one unseen still never certifies character/world/acting/animation transfer (R23)"})
+        return "COMPLETED", {"transfer": "STILL_TRANSFER_PENDING_AWAITING_REVIEW", "animated_transfer": "NOT_ATTEMPTED",
+                             "holdout": sealed[0], "output_sha": r["n_whole_scene"]["sha"],
                              "next_question_stage": (nq or {}).get("owner_stage"), "next_question": (nq or {}).get("question_text")}
 
 

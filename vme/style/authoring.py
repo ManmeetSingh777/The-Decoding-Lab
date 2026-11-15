@@ -85,7 +85,17 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
                          "clause_ids": [], "reference_role_ids": [role], "mandatory_reference_role_ids": [role] if ref_required else [],
                          "operation_node_ids": [op] if op else [], "priority": 10 + i, "witness_ids": cited})
     contradictions = list((prev or {}).get("contradictions", []))
-    if prev:   # same production choice re-answered: keep earlier branches; conflicting actions are retained, not overwritten
+    superseded = list((prev or {}).get("superseded_branches", []))
+    reopened = bool(prev) and str(prev.get("research_only_reason", "")).startswith("REOPENED_BY_HUMAN")
+    if reopened:   # a human art rejection REJECTED the earlier action: it is superseded (kept with its review), not a contradiction
+        reopened_keys = {(json_key(b["when"]), tuple(b["operation_node_ids"])) for b in branches}
+        for b in prev["branches"]:
+            if (json_key(b["when"]), tuple(b["operation_node_ids"])) in reopened_keys:
+                superseded.append({**b, "superseded_by_review": prev["research_only_reason"].split(":", 1)[1],
+                                   "defects": prev.get("reopened_defects", []), "at": now_iso()})
+            else:
+                branches.append(dict(b))
+    elif prev:   # same production choice re-answered: keep earlier branches; conflicting actions are retained, not overwritten
         new_keys = {(json_key(b["when"]), tuple(b["operation_node_ids"])): b for b in branches}
         for b in prev["branches"]:
             k = (json_key(b["when"]), tuple(b["operation_node_ids"]))
@@ -127,7 +137,8 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
              evidence_origin=wrecs[0].get("evidence_origin", "UNKNOWN"), authored_at=now_iso(),
              owned_choice_ids=sorted(set(owned_choice_ids) | set((prev or {}).get("owned_choice_ids", []))),
              phenomenon=phenomenon, identity_basis="PRODUCTION_CHOICE+PHENOMENON (not dimension tags)",
-             contradictions=contradictions, exemplar_witness_ids=exemplars, reference_required=ref_required,
+             contradictions=contradictions, superseded_branches=superseded, exemplar_witness_ids=exemplars, reference_required=ref_required,
+             revision_of=(prev or {}).get("research_only_reason") if reopened else None,
              claim_state=("UNRESOLVED" if d["status"] == "RESEARCH_ONLY" else "METHOD_CANDIDATE"),
              observed_vs_inferred={"observed": [f.get("relation") for f in answer.get("SOURCE_VISIBLE_FACTS") or []],
                                    "inferred_mechanism": answer.get("CONSTRUCTION_EXPLANATION", ""),

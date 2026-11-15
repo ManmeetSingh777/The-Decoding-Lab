@@ -127,6 +127,26 @@ class GateKeeper:
                 self._invalidate(run_id, "APPROVED_ART_BYTES_CHANGED")
                 raise Blocked("APPROVED_ART_BYTES_CHANGED", "art changed after approval: reapproval required")
 
+    def reopen(self, run_id: str, level: str, *, reason: str) -> dict:
+        """Deterministic downstream invalidation (R12): ART clears art+asset approvals and returns to ART_GENERATING;
+        ASSET clears asset approvals and returns to ASSET_PREPARING. Approvals stay in the store (append-only), unusable."""
+        st = self.state(run_id)
+        if level == "ART":
+            if st["state"] in ("AWAITING_PROVIDER_OR_SOURCE", "ART_GENERATING"):
+                return st
+            st.update(state="ART_GENERATING", required_art_approval_ids=[], required_asset_approval_ids=[],
+                      authorized_render_art_hashes=[], authorized_render_asset_hashes=[])
+        elif level == "ASSET":
+            if st["state"] in ("ASSET_PREPARING",):
+                return st
+            st.update(state="ASSET_PREPARING", required_asset_approval_ids=[], authorized_render_asset_hashes=[])
+        else:
+            raise Blocked("UNKNOWN_REOPEN_LEVEL", level)
+        st.setdefault("history", []).append({"to": st["state"], "reason": f"REOPEN_{level}: {reason}", "at": now_iso()})
+        self.store.put("VisualGateState", run_id, st)
+        self.store.event("GATE_REOPENED", run_id, {"level": level, "reason": reason})
+        return st
+
     def _invalidate(self, run_id: str, reason: str) -> None:
         st = self.state(run_id)
         st["authorized_render_art_hashes"] = []

@@ -28,7 +28,12 @@ def drill_brief(brief_id: str = "BRIEF-DRILL-ANCHOR", subject: str = "deep-sea r
                       "world": {"kind": env, "layers": True, "lighting": "directional"}},
             "shot_plan": {"actions": [{"actor": "explorer", "event_id": "e1", "view": "front"},
                                       {"actor": "explorer", "event_id": "e2", "contact_prop": "chamber_handle", "hand_side": "right"}],
-                          "events": [{"from": 20, "to": 39, "state": "view:front"}, {"from": 40, "to": 59, "state": "grip:chamber_handle"}],
+                          "events": [{"event_id": "e1", "actor": "explorer", "from": 20, "to": 39, "state": "view:front"},
+                                     {"event_id": "e2", "actor": "explorer", "from": 40, "to": 59, "state": "grip:chamber_handle"}],
+                          "plan_width": 1280,
+                          "actors": [{"id": "explorer", "x": 640, "y": 140, "w": 560, "h": 560, "z": 2,
+                                      "keyframes": [{"frame": 0, "x": 640}, {"frame": 59, "x": 600}],
+                                      "directed_by": "DRILL brief author (fixture)"}],
                           "camera": [{"frame": 0, "x": 0, "y": 0, "scale": 1.0}, {"frame": 59, "x": 20, "y": 0, "scale": 1.05}],
                           "fps": 30, "frames": 60}}
 

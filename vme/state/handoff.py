@@ -16,7 +16,7 @@ from pathlib import Path
 from ..util import Blocked, atomic_write_json, digest, now_iso, read_json, sha256_file
 from .workspace import Workspace
 
-INCLUDE_DIRS = ("state", "skills", "artifacts", "vision", "investigation", "frames", "reports", "logs", "runs", "config")
+INCLUDE_DIRS = ("state", "skills", "artifacts", "vision", "investigation", "frames", "reports", "logs", "runs", "config", "providers")
 EXCLUDE_SUFFIX = (".mp4", ".mov", ".mkv", ".m4v", ".tmp", ".sqlite-wal", ".sqlite-shm", ".pyc")
 EXCLUDE_NAMES = (".env", "issuer.key")
 SECRET_PATTERNS = (re.compile(rb"RUNWARE_API_KEY\s*=\s*\S{8,}"), re.compile(rb"Bearer\s+[A-Za-z0-9_\-]{16,}"),
@@ -125,7 +125,15 @@ def exact_next_operation(ws: Workspace) -> dict:
     """Recompute the single next operation from DB state (not from chat): pending jobs first, then packets, then problems."""
     st = ws.store()
     try:
-        pend = st.conn.execute("SELECT job_key, state, task_uuid FROM jobs WHERE state IN ('IN_FLIGHT','RESPONSE_SAVED','UNKNOWN_BILLING')").fetchall()
+        pend = st.conn.execute("SELECT job_key, state, task_uuid FROM jobs WHERE state IN "
+                               "('INTENT_PERSISTED','IN_FLIGHT','RESPONSE_SAVED','UNKNOWN_BILLING')").fetchall()
+        vdir = ws.root / "providers" / "anthropic"
+        for tp in sorted(vdir.glob("task_*.json")) if vdir.exists() else []:
+            j = read_json(tp)
+            if j.get("state") in ("SUBMISSION_ATTEMPTED", "SUBMISSION_UNCERTAIN"):
+                return {"kind": "RECONCILE_VISION_SUBMISSION", "custom_id": j["task_id"], "state": j["state"],
+                        "command": "human: check the Anthropic console for this custom_id, then reconcile_uncertain(... batch_id=... | "
+                                   "not_submitted_evidence=...); never resubmit blindly"}
         if pend:
             k, s, t = pend[0]
             return {"kind": "RECONCILE_PROVIDER_JOB", "job_key": k, "state": s, "task_uuid": t,

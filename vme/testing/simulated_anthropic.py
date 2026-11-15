@@ -240,8 +240,11 @@ def _answer(user, imgs) -> dict:
         if rb["operation_ids"][0] == "op.world_plate":
             return (f"SIMULATED: paint the {{setting}} as an empty plate whose depth layers keep a clear value step between near and far "
                     f"planes, leaving the focal area open for a separately drawn actor ({cond})")
+        rev = ""
+        if user.get("human_art_defects"):
+            rev = f"; revised after {len(user['human_art_defects'])} rejected-art defect(s): the near contour is redrawn over the adjacent part"
         return (f"SIMULATED: draw the {{subject}} with {' and '.join(d.lower().replace('_', ' ') for d in dims)} decided together, "
-                f"keeping its connected parts separated from the {{setting}} by value grouping ({cond})")
+                f"keeping its connected parts separated from the {{setting}} by value grouping ({cond}){rev}")
     base["BRANCHES"] = [{"when": rb["conditions"], "operation_id": rb["operation_ids"][0], "construction_action": action(rb)}
                         for rb in user["required_branches"]]
     return base

@@ -382,3 +382,20 @@ def test_anthropic_sdk_pinned_and_request_serializes(tmp_path):
     ClaudeBatchVisionAdapter.validate_params(params, max_images=20)
     from anthropic.types.messages.batch_create_params import Request   # SDK request TypedDict exists in the pinned version
     assert "custom_id" in Request.__annotations__ and "params" in Request.__annotations__
+
+
+@pytest.mark.req("R07", "ST28-24")
+def test_crash_after_response_saved_before_settle_neither_loses_cost_nor_replays(tmp_path, store, monkeypatch):
+    from vme.vision.runner import SimulatedCrash
+    monkeypatch.setenv("VME_ALLOW_NETWORK", "1")
+    g, t, reg, snap = _real_gateway(tmp_path, store, cost=0.2)
+    job = _probe_job(snap)
+    monkeypatch.setenv("VME_CRASH_AT", "gateway_after_response_saved")
+    with pytest.raises(SimulatedCrash):
+        g.submit(job, task_category="capability_probe", probe=True)
+    assert [x["status"] for x in reg.ledger.rows()] == ["RESERVED"]          # liability still counted against the cap
+    monkeypatch.delenv("VME_CRASH_AT")
+    r = g.submit(job, task_category="capability_probe", probe=True)
+    rows = reg.ledger.rows()
+    assert t.billed() == 1 and t.duplicate_bills() == 0 and len(rows) == 1
+    assert rows[0]["status"] == "SETTLED" and rows[0]["actual_cost"] == pytest.approx(0.2) and r["cost_usd"] == pytest.approx(0.2)

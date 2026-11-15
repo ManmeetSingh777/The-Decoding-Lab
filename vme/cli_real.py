@@ -60,6 +60,12 @@ def register(sub, wsf):
         _p(freeze_real_skill(ws, Path(a.folder), approved_by=a.by))
     add("freeze-skill", freeze, (["--folder"], {"required": True}), (["--by"], {"required": True}))
 
+    def ref_consent(ws, a):
+        from .loop.human import consent_reference_exemplars
+        _p(consent_reference_exemplars(ws, film_sha=a.film_sha, by=a.by, statement=a.statement))
+    add("reference-consent", ref_consent, (["--film-sha"], {"required": True}), (["--by"], {"required": True}),
+        (["--statement"], {"required": True}))
+
     def assets(ws, a):
         from .review.approvals import GateKeeper
         st = ws.store()

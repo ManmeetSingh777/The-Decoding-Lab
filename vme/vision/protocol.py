@@ -128,7 +128,7 @@ _RELATIONAL = re.compile(r"\b(while|as|relative to|against|behind|in front of|ov
                          r"stays|persist|than|across|between|follows|before|after)\b", re.I)
 
 
-def assess_sufficiency(answer: dict, *, producing_operator: str, known_witness_ids: set[str]) -> dict:
+def assess_sufficiency(answer: dict, *, producing_operator: str | list, known_witness_ids: set[str]) -> dict:
     """Is this answer able to control a producing choice? Field presence is NOT enough. Returns verdict + reasons.
 
     INSUFFICIENT_FOR_PRODUCING_CHOICE when facts are adjective-only, uncited, non-relational, or no branch changes the named operator.
@@ -144,7 +144,8 @@ def assess_sufficiency(answer: dict, *, producing_operator: str, known_witness_i
         reasons.append("FACTS_ARE_NOT_RELATIONAL_OR_ARE_ADJECTIVE_ONLY")
     if is_vague_statement(answer.get("CONSTRUCTION_EXPLANATION", "")) or len(answer.get("CONSTRUCTION_EXPLANATION", "").split()) < 6:
         reasons.append("MECHANISM_HYPOTHESIS_ABSENT_OR_VAGUE")
-    brs = [b for b in answer.get("BRANCHES") or [] if b.get("operation_id") == producing_operator and b.get("construction_action")]
+    ops = {producing_operator} if isinstance(producing_operator, str) else set(producing_operator)
+    brs = [b for b in answer.get("BRANCHES") or [] if b.get("operation_id") in ops and b.get("construction_action")]
     if answer.get("answer_status") not in ("UNKNOWN", "REFUTED") and not brs:
         reasons.append("NO_BRANCH_CHANGES_THE_PRODUCING_OPERATOR")
     if brs and all(is_vague_statement(b["construction_action"]) for b in brs):

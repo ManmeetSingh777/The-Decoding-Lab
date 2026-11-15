@@ -228,7 +228,7 @@ class ClaudeBatchVisionAdapter:
                 raise Blocked("PROVIDER_EXECUTION", f"batch result {rtype}")
             msg = r.result.message
             usage = getattr(msg, "usage", None)
-            raw = {"stop_reason": getattr(msg, "stop_reason", None), "model": getattr(msg, "model", None),
+            raw: dict[str, Any] = {"stop_reason": getattr(msg, "stop_reason", None), "model": getattr(msg, "model", None),
                    "content": [{"type": getattr(c, "type", None), "text": getattr(c, "text", None)} for c in msg.content],
                    "usage": {"input_tokens": getattr(usage, "input_tokens", None), "output_tokens": getattr(usage, "output_tokens", None)}}
             rp = self.state / f"raw_{task_id}.json"
