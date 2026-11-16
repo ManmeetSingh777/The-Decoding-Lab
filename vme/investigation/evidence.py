@@ -11,7 +11,7 @@ from dataclasses import dataclass, asdict, field
 from ..util import Blocked, digest, is_sha256, is_vague_statement
 
 EVIDENCE_KINDS = ("FULL_FRAME", "NATIVE_CROP", "TEMPORAL_COMPARE", "CROSS_SEQUENCE", "ORIGINAL_OUTPUT", "SYNTHETIC_FIXTURE", "AUDIO_SIGNAL")
-OBSERVERS = ("VLM", "HUMAN", "SYNTHETIC_FIXTURE", "ORIGINAL_OUTPUT_REVIEW")
+OBSERVERS = ("VLM", "HUMAN", "SYNTHETIC_FIXTURE", "ORIGINAL_OUTPUT_REVIEW", "LOCAL_SIGNAL_ANALYSIS")
 
 
 @dataclass
@@ -89,6 +89,17 @@ def validate_bundle(b: WitnessBundle, *, purpose: str = "style_decision") -> dic
             problems.append(f"BAD_FRAME_SPAN:{w.witness_id}")
         if is_vague_statement(w.visible_relation):
             problems.append(f"VAGUE_VISIBLE_RELATION:{w.witness_id}")
+        if w.observer == "LOCAL_SIGNAL_ANALYSIS" and w.evidence_kind != "AUDIO_SIGNAL":
+            problems.append(f"LOCAL_SIGNAL_OBSERVER_ON_VISUAL_EVIDENCE:{w.witness_id}")
+        if w.evidence_kind == "AUDIO_SIGNAL":
+            if w.observer != "LOCAL_SIGNAL_ANALYSIS":
+                problems.append(f"AUDIO_SIGNAL_WRONG_OBSERVER:{w.witness_id}")
+            parent = ids.get(w.parent_full_frame_witness or "")
+            # an audio onset is evidence ONLY together with the full frame it coincides with: same film, same frame span (±1)
+            if not parent or parent.evidence_kind not in ("FULL_FRAME", "SYNTHETIC_FIXTURE"):
+                problems.append(f"AUDIO_WITHOUT_FULL_FRAME_CONTEXT:{w.witness_id}")
+            elif parent.film_sha256 != w.film_sha256 or abs(parent.frame_start - w.frame_start) > 1:
+                problems.append(f"AUDIO_PARENT_MISALIGNED:{w.witness_id}")
         if w.evidence_kind == "NATIVE_CROP":
             parent = ids.get(w.parent_full_frame_witness or "")
             if not parent or parent.evidence_kind not in ("FULL_FRAME", "SYNTHETIC_FIXTURE"):

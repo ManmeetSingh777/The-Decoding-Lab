@@ -17,6 +17,13 @@ CHOICE_FOR_TRACK = {"ACTOR_ACTING": "{actor}:acting", "CAMERA": "camera:depth", 
                     "AUDIO": "audio_timing"}
 
 
+def _decision_of_clause(cid: str | None) -> str | None:
+    """Clause ids are K-<decision_id>-<branch>@<op>; decision ids themselves contain '-' (PC-<hex>)."""
+    if not cid or not cid.startswith("K-") or "@" not in cid:
+        return None
+    return cid[2:].split("@", 1)[0].rsplit("-", 1)[0]
+
+
 def _owner(decisions: list[dict], plan: dict, track: str, actor: str | None) -> tuple[dict, dict]:
     from ..style.coverage import owns
     cid = CHOICE_FOR_TRACK[track].format(actor=actor)
@@ -93,8 +100,7 @@ def compile_event_program(*, decisions: list[dict], scope, brief: dict, pack: di
             st_ = pack["states"].get(f"{a['id']}:{e['state']}") or pack["states"].get(e["state"])
             if st_ is None:
                 raise Blocked("EVENT_STATE_NOT_PRODUCED", str(e))
-            tracks.append({"kind": "ACTOR_DRAWING_STATE", "actor_id": a["id"], "owner_decision_id": (st_.get("clause_ids") or ["?"])[0].split("-")[1]
-                           if st_.get("clause_ids") else None, "clause_ids": st_.get("clause_ids"), "method": "STEPPED_REDRAW",
+            tracks.append({"kind": "ACTOR_DRAWING_STATE", "actor_id": a["id"], "owner_decision_id": _decision_of_clause((st_.get("clause_ids") or [None])[0]), "clause_ids": st_.get("clause_ids"), "method": "STEPPED_REDRAW",
                            "interpolation_or_redraw_method": "APPROVED_REDRAWN_STATE", "start_frame": int(e["from"]),
                            "end_frame": int(e["to"]), "state": e["state"], "asset_sha256": st_["sha256"]})
             if "grip" in e["state"]:

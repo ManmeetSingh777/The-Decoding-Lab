@@ -62,8 +62,12 @@ def validate_character_art_study(dossier: dict, authorized: set[str]) -> list[st
     return p
 
 
+def _fields(dossier: dict) -> dict:
+    return (dossier.get("study") or {}).get("fields") or dossier.get("fields") or {}
+
+
 def dossier_open_fields(dossier: dict) -> list[str]:
-    return [f for f in CHAR_FIELDS if ((dossier.get("fields") or {}).get(f) or {}).get("state") != "OBSERVED"]
+    return [f for f in CHAR_FIELDS if (_fields(dossier).get(f) or {}).get("state") != "OBSERVED"]
 
 
 def source_art_ledger(st, ws, run_id: str, intervals: list[tuple], pass_id: str) -> dict:
@@ -123,7 +127,7 @@ def source_art_ledger(st, ws, run_id: str, intervals: list[tuple], pass_id: str)
                                   "problems": (d or {}).get("problems")})
             elif dossier_open_fields(d):
                 open_gaps.append({"kind": "CHARACTER_STATE_UNEXPLAINED", "entity_id": e, "fields": dossier_open_fields(d),
-                                  "next": [((d.get("fields") or {}).get(f) or {}).get("precise_next_witness") for f in dossier_open_fields(d)]})
+                                  "next": [(_fields(d).get(f) or {}).get("precise_next_witness") for f in dossier_open_fields(d)]})
         reviewed = [o for o in obs if auth.get("SOURCE_ART_REVIEW", {"frame_id": o["frame_id"]})]
         scenes.append({"selected_scene": seq, "film_sha256": film, "range": [a, b], "target_frames": b - a + 1,
                        "frames_identity_bound": len(bound), "packets": len(packets), "typed_observations": len(obs),

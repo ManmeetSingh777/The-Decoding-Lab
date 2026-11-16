@@ -494,22 +494,30 @@ class RealLoopRunner:
         fps = 1.0 / max(1e-6, (idx[-1]["pts_time"] - idx[0]["pts_time"]) / max(1, len(idx) - 1))
         rec = study_interval(Path(lock["folder"]) / s["relative_path"], start_pts=idx[a]["pts_time"], end_pts=idx[b]["pts_time"], fps=fps,
                              film_sha256=film, sequence_id=seq)
-        st.put("SourceAudioStudy", f"{self.run_id}:{seq}", rec)
+        st.put("SourceAudioStudy", f"{self.run_id}:{seq}", rec)   # (re-put below if onsets stay unlinked)
         changed = {int(str(o["frame_id"]).split(":")[1]) for o in obs if o.get("changed_since_prior_frame")}
+        full = {w["frame_start"]: w["witness_id"] for w in st.list("Witness")
+                if w["film_sha256"] == film and w.get("sequence_id") == seq and w.get("evidence_kind") == "FULL_FRAME"}
         for j, of in enumerate(rec.get("onset_frames", [])[:5]):
             k = a + of
             if k > b:
                 continue
+            near = sorted((x for x in full if abs(x - k) <= 1), key=lambda x: (abs(x - k), x))
+            if not near:            # no committed full-frame witness at this time: the onset stays unlinked, never fabricated
+                rec.setdefault("unlinked_onsets", []).append(k)
+                continue
+            parent = full[near[0]]
             wid = f"W-{film[:10]}-{k}-audio-{j}"
             vis_change = any(abs(k - c) <= 1 for c in changed)
             st.put("Witness", wid, {"witness_id": wid, "film_sha256": film, "sequence_id": seq, "frame_start": k, "frame_end": k,
-                                    "evidence_kind": "AUDIO_SIGNAL", "observer": "LOCAL_SIGNAL_ANALYSIS",
-                                    "visible_relation": (f"an audio onset at frame {k} coincides with a recorded visible change in the frame"
-                                                         if vis_change else f"an audio onset at frame {k} occurs while the frame shows no recorded change"),
+                                    "evidence_kind": "AUDIO_SIGNAL", "observer": "LOCAL_SIGNAL_ANALYSIS", "parent_full_frame_witness": parent,
+                                    "visible_relation": (f"an audio onset at frame {k} occurs together with a recorded visible change of the frame relative to the previous frame"
+                                                         if vis_change else f"an audio onset at frame {k} occurs while the frame stays unchanged relative to the previous frame"),
                                     "image_sha256": idx[k]["frame_content_sha256"], "region": None, "subject_class": None,
                                     "scene_specific_facts": [], "observation_ids": [f"{film[:16]}:{k}"],
                                     "limits": "local RMS onset only; meaning unstudied", "dimensions": ["VISUAL_AUDIO_TIMING"],
                                     "pts_time": idx[k]["pts_time"], "evidence_origin": "LOCAL_SIGNAL_ANALYSIS", "audio_study": f"{self.run_id}:{seq}"})
+        st.put("SourceAudioStudy", f"{self.run_id}:{seq}", rec)
         return rec
 
     def _extract_witnesses(self, st, film, seq, obs, idx) -> int:
@@ -799,7 +807,16 @@ class RealLoopRunner:
                 ctx.decisions.pop(did, None)
                 q = lc.step_question(p, gap_id=g["gap_id"])
             imgs = []
-            for wid in (q.observed_contrast_with_witness_ids or refs)[:6]:
+            send_ids = []
+            for wid in (q.observed_contrast_with_witness_ids or refs):
+                par = (wits.get(wid) or {}).get("parent_full_frame_witness") if (wits.get(wid) or {}).get("evidence_kind") == "AUDIO_SIGNAL" else None
+                need = [wid] + ([par] if par and par not in send_ids and par in wits else [])
+                if par and par not in wits:
+                    continue                      # audio evidence without its frame context is never sent alone
+                if len(send_ids) + len([x for x in need if x not in send_ids]) > 6:
+                    break
+                send_ids += [x for x in need if x not in send_ids]
+            for wid in send_ids:
                 w = wits[wid]
                 _, idx, cache = self._film(w["film_sha256"])
                 fr = cache.frame(w["frame_start"])
@@ -1092,6 +1109,14 @@ class RealLoopRunner:
                 films.add(w["film_sha256"])
             if len(refs) >= 3:
                 break
+        for r_ in list(refs):              # an AUDIO_SIGNAL witness is only evidence together with its full-frame parent
+            w_ = st.get("Witness", r_)
+            if w_ and w_.get("evidence_kind") == "AUDIO_SIGNAL":
+                par = w_.get("parent_full_frame_witness")
+                if not par or not st.get("Witness", par):
+                    refs.remove(r_)
+                elif par not in refs:
+                    refs.append(par)
         contrast = [w["witness_id"] for w in ws if w["witness_id"] not in refs and w["film_sha256"] not in films][:2] or \
                    [w["witness_id"] for w in ws if w["witness_id"] not in refs and w.get("subject_class") not in
                     {x.get("subject_class") for x in ws if x["witness_id"] in refs}][:2]

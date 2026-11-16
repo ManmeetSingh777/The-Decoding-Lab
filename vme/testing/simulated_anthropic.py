@@ -283,7 +283,7 @@ def _answer(user, imgs) -> dict:
         return (f"SIMULATED: draw the {{subject}} with {' and '.join(d.lower().replace('_', ' ') for d in dims)} decided together, "
                 f"keeping its connected parts separated from the {{setting}} by value grouping ({cond}){rev}")
     def policy(rb):
-        if any(d.startswith("CHARACTER") for d in dims) and rb["operation_ids"][0] not in MOTION_OPS:
+        if dims in (["CHARACTER_WHOLE_DESIGN"], ["CHARACTER_BODY_HAND_CONTACT"]) and rb["operation_ids"][0] not in MOTION_OPS:
             roles = [{"role": "positive_view", "witness_id": wids[0]}] + ([{"role": "contrast", "witness_id": wids[1]}] if len(wids) > 1 else [])
             return {"mode": "REQUIRED", "roles": roles, "reason": "SIMULATED: character construction needs visual exemplars"}
         return {"mode": "NOT_APPLICABLE", "reason": "SIMULATED: decision carried by the relation clause; no exemplar conditioning claimed"}

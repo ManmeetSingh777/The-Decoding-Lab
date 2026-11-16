@@ -147,6 +147,20 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
     contrast = [w for w in question.get("observed_contrast_with_witness_ids", []) if w not in cited]
     wrecs = [store.get("Witness", w) for w in cited + contrast]
     wrecs = [w for w in wrecs if w]
+    # an AUDIO_SIGNAL witness is evidence only with the full frame it coincides with: attach that parent as context, but ONLY when the
+    # local submission manifest shows it was actually sent in this request (never pulled in from the store unseen)
+    have = {w["witness_id"] for w in wrecs}
+    for w in list(wrecs):
+        par = w.get("parent_full_frame_witness") if w.get("evidence_kind") == "AUDIO_SIGNAL" else None
+        if par and par not in have and par in authorized:
+            pw = store.get("Witness", par)
+            if pw:
+                wrecs.append(pw)
+                have.add(par)
+                contrast.append(par)
+        elif par and par not in have and w["witness_id"] not in cited:
+            wrecs.remove(w)                       # uncited audio contrast whose frame context was not sent: excluded, not imported
+            contrast.remove(w["witness_id"])
     if not wrecs:
         raise Blocked("NO_EVIDENCE_FOR_DECISION", question["question_id"])
     bundle = WitnessBundle(f"WB-{question['question_id']}", question["question_id"], answer.get("CONSTRUCTION_EXPLANATION", ""),
