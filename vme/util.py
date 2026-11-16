@@ -90,6 +90,20 @@ def _fsync_dir(path: Path) -> None:
         pass
 
 
+def _replace_retrying(tmp: str, dst: Path, attempts: int = 25, delay_s: float = 0.05) -> None:
+    """os.replace, retried briefly on Windows sharing violations (antivirus / search indexer holding the target for a moment,
+    common right after resume-from-sleep). Still a single atomic rename; a persistent denial re-raises the real error."""
+    import time
+    for k in range(attempts):
+        try:
+            os.replace(tmp, dst)
+            return
+        except PermissionError:
+            if os.name != "nt" or k == attempts - 1:
+                raise
+            time.sleep(delay_s * min(4, k + 1))          # ≤ ~4.4 s in total before the real error is raised
+
+
 def atomic_write_bytes(path: str | os.PathLike, data: bytes) -> str:
     """temp -> flush -> fsync -> rename. Returns sha256 of written bytes."""
     p = Path(path)
@@ -100,7 +114,7 @@ def atomic_write_bytes(path: str | os.PathLike, data: bytes) -> str:
             f.write(data)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, p)
+        _replace_retrying(tmp, p)
         _fsync_dir(p.parent)
     except BaseException:
         try:

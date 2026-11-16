@@ -515,6 +515,28 @@ def test_f13_motion_is_owned_by_source_decisions_and_ablation_changes_or_blocks_
     assert all(t["interpolation_or_redraw_method"] not in (None, "DEFAULT_LINEAR", "WHOLE_STATE_SWAP_ONLY") for t in p["tracks"])
 
 
+@pytest.mark.req("R3-F07")
+def test_atomic_write_survives_a_transient_windows_lock_but_not_a_persistent_one(tmp_path, monkeypatch):
+    import os as _os
+    from vme import util
+    real = _os.replace
+    calls = {"n": 0}
+
+    def flaky(a, b):
+        calls["n"] += 1
+        if calls["n"] <= 3:
+            raise PermissionError(5, "Access is denied")
+        return real(a, b)
+    monkeypatch.setattr(util.os, "replace", flaky)
+    monkeypatch.setattr(util.os, "name", "nt")
+    util.atomic_write_json(tmp_path / "x.json", {"a": 1})
+    assert json.loads((tmp_path / "x.json").read_text(encoding="utf-8")) == {"a": 1} and calls["n"] == 4
+    monkeypatch.setattr(util.os, "replace", lambda a, b: (_ for _ in ()).throw(PermissionError(5, "Access is denied")))
+    with pytest.raises(PermissionError):
+        util.atomic_write_json(tmp_path / "y.json", {"a": 2})
+    assert not (tmp_path / "y.json").exists() and not list(tmp_path.glob(".y.json.*.tmp"))   # no partial file, temp removed
+
+
 @pytest.mark.req("R3-F14", "R3-F04")
 def test_f14_audio_witness_is_evidence_only_with_its_aligned_full_frame_parent():
     """S2 blocker fix: the audio observer is registered, but only for AUDIO_SIGNAL with a same-film full frame within ±1 frame."""
