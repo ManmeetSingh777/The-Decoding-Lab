@@ -61,9 +61,87 @@ def register_relations_from_answer(store, question: dict, answer: dict, dims: li
     return ids
 
 
+REFERENCE_MODES = ("REQUIRED", "TEXT_ONLY_DEMONSTRATED", "NOT_APPLICABLE")
+CHARACTER_OPS = ("op.canonical_character", "op.face_view_state", "op.hand_prop_contact", "op.guided_pose_edit")
+
+
+def authorize_answer(store, question: dict, answer: dict, *, authorized_submission_manifest: dict, registered_ops: dict,
+                     allowed_ops: list[str]) -> set[str]:
+    """R3 F04/F10 — the central write-site guard. Returns the locally authorized witness ids or raises the exact root cause.
+
+    * Only STYLE_CONDITIONS questions (a locally built envelope) may publish a skill-bearing decision.
+    * Cited witnesses must be a subset of what the LOCAL submission journal says was actually sent for this exact request — never the
+      model's own `answer_evidence_ids` — and must match that manifest's source film, frame index (PTS) and crop region.
+    * The answer must be sufficient to control a REGISTERED producing operator.
+    """
+    from ..vision.protocol import assess_sufficiency
+    if question.get("owner_stage") != "STYLE_CONDITIONS":
+        raise Blocked("EARLY_STAGE_CANNOT_PUBLISH_SKILL", f"{question.get('owner_stage')} answers create observations only")
+    man = authorized_submission_manifest or {}
+    allowed = set(man.get("submitted_witness_ids") or [])
+    if not allowed:
+        raise Blocked("NO_ACTUAL_SUBMISSION_MANIFEST", question.get("question_id", "?"))
+    cited = {w for f in answer.get("SOURCE_VISIBLE_FACTS") or [] for w in (f.get("witness_ids") or [])}
+    if not cited:
+        raise Blocked("UNCITED_ARTISTIC_CLAIM", question.get("question_id", "?"))
+    if cited - allowed:
+        raise Blocked("UNSENT_WITNESS_CITATION", str(sorted(cited - allowed)[:5]))
+    by_wid = {m["witness_id"]: m for m in man.get("byte_manifest") or []}
+    for wid in sorted(cited):
+        w = store.get("Witness", wid)
+        m = by_wid[wid]
+        if w is None:
+            raise Blocked("CITED_WITNESS_NOT_IN_STORE", wid)
+        if w["film_sha256"] != m["source_sha256"]:
+            raise Blocked("WRONG_SOURCE_WITNESS", wid)
+        if int(w["frame_start"]) != int(m["frame_index"]):
+            raise Blocked("WRONG_PTS_WITNESS", f"{wid}: witness frame {w['frame_start']} != sent frame {m['frame_index']}")
+        if (w.get("evidence_kind") == "NATIVE_CROP") != bool(m.get("region")) or (m.get("region") and w.get("region") != m["region"]):
+            raise Blocked("UNSEEN_CROP_OR_WRONG_REGION", wid)
+    bad_ops = [b.get("operation_id") for b in answer.get("BRANCHES") or [] if b.get("operation_id") not in registered_ops]
+    if bad_ops:
+        raise Blocked("UNREGISTERED_OPERATOR", str(bad_ops))
+    proof = assess_sufficiency(answer, producing_operator=allowed_ops, known_witness_ids=allowed)
+    if proof["verdict"] != "SUFFICIENT_FOR_PRODUCING_CHOICE":
+        raise Blocked("INSUFFICIENT_FOR_PRODUCING_CHOICE", ";".join(proof["reasons"]))
+    return allowed
+
+
+def _reference_policy(b: dict, did: str, allowed: set[str], authority) -> tuple[dict, str | None]:
+    """Explicit per-branch conditioning policy. A missing/unknown policy is UNKNOWN (fail closed), never 'not required'."""
+    pol = b.get("reference_policy")
+    if not isinstance(pol, dict) or pol.get("mode") not in REFERENCE_MODES:
+        return {"mode": "UNKNOWN"}, "REFERENCE_POLICY_UNKNOWN"
+    mode = pol["mode"]
+    if mode == "REQUIRED":
+        roles = [r for r in pol.get("roles") or [] if isinstance(r, dict)]
+        if not roles:
+            return {"mode": mode, "roles": []}, "REQUIRED_REF_WITHOUT_ROLES"
+        if any(r.get("witness_id") not in allowed for r in roles):
+            return {"mode": mode, "roles": roles}, "REQUIRED_REF_UNSEEN"
+        names = [r.get("role") for r in roles]
+        if len(set(names)) != len(names) or not all(names):
+            return {"mode": mode, "roles": roles}, "AMBIGUOUS_REFERENCE_ROLES"
+        return {"mode": mode, "roles": [{"role": r["role"], "witness_id": r["witness_id"]} for r in roles]}, None
+    if mode == "TEXT_ONLY_DEMONSTRATED":
+        if authority is None or not authority.text_only_transfer(did, {k: str(v) for k, v in (b.get("when") or {}).items()},
+                                                                  b.get("construction_action", "")):
+            return {"mode": mode}, "TEXT_ONLY_NOT_PROVEN"
+        return {"mode": mode}, None
+    if not str(pol.get("reason", "")).strip():
+        return {"mode": mode}, "NOT_APPLICABLE_UNJUSTIFIED"
+    return {"mode": mode, "reason": pol["reason"]}, None
+
+
 def author_decision(store, question: dict, answer: dict, *, dims: list[str], registered_ops: dict, required_branches: list[dict],
-                    decision_id: str, owned_choice_ids: list[str], phenomenon: str) -> dict:
-    """Build/extend ONE production-choice decision ONLY from the evidenced answer; unknowns stay RESEARCH_ONLY."""
+                    decision_id: str, owned_choice_ids: list[str], phenomenon: str, authorized_submission_manifest: dict) -> dict:
+    """Build/extend ONE production-choice decision ONLY from an authorized, sufficient STYLE_CONDITIONS answer (R3 F10)."""
+    from ..state.authority import AuthorityRegistry
+    allowed_ops = sorted({o for r in required_branches for o in r["operation_ids"]}) or \
+        sorted({b.get("operation_id") for b in answer.get("BRANCHES") or [] if b.get("operation_id")})
+    authorized = authorize_answer(store, question, answer, authorized_submission_manifest=authorized_submission_manifest,
+                                  registered_ops=registered_ops, allowed_ops=allowed_ops)
+    authority = AuthorityRegistry(store)
     rel_ids = register_relations_from_answer(store, question, answer, dims)
     cited = sorted({w for f in answer.get("SOURCE_VISIBLE_FACTS") or [] for w in f.get("witness_ids", [])})
     contrast = [w for w in question.get("observed_contrast_with_witness_ids", []) if w not in cited]
@@ -76,13 +154,26 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
                            contrasting_witness_ids=contrast)
     did = decision_id
     prev = store.get("ConditionalVisualDecision", did)
-    ref_required = bool(answer.get("REFERENCE_REQUIRED"))
-    branches = []
+    branches, policy_problems = [], []
+    seen_keys: dict = {}
     for i, b in enumerate(answer.get("BRANCHES") or []):
         op = b.get("operation_id")
-        role = f"exemplar:{did}:{digest([b.get('when'), op])[:8]}"
-        branches.append({"when": {k: str(v) for k, v in (b.get("when") or {}).items()}, "construction_action": b.get("construction_action", ""),
-                         "clause_ids": [], "reference_role_ids": [role], "mandatory_reference_role_ids": [role] if ref_required else [],
+        when = {k: str(v) for k, v in (b.get("when") or {}).items()}
+        key = (json_key(when), op)
+        if key in seen_keys and seen_keys[key] != b.get("construction_action", ""):
+            raise Blocked("CONFLICTING_EQUALLY_APPLICABLE_BRANCHES", f"{did}: {when} / {op}")
+        seen_keys[key] = b.get("construction_action", "")
+        pol, problem = _reference_policy(b, did, authorized, authority)
+        if problem:
+            policy_problems.append({"when": when, "operation": op, "problem": problem})
+        # one DISTINCT role per declared reference role, each bound to ITS witness (never sorted(wids)[0] for every role)
+        roles = [{"role_id": f"exemplar:{did}:{digest([when, op, r['role']])[:8]}", "role": r["role"], "witness_id": r["witness_id"]}
+                 for r in pol.get("roles", [])]
+        mandatory = [r["role_id"] for r in roles] if pol["mode"] == "REQUIRED" else []
+        mp = b.get("MOTION_PROGRAM") if isinstance(b.get("MOTION_PROGRAM"), dict) else None
+        branches.append({"when": when, "construction_action": b.get("construction_action", ""), "clause_ids": [],
+                         "reference_role_ids": [r["role_id"] for r in roles], "mandatory_reference_role_ids": mandatory,
+                         "reference_policy": {**pol, "role_bindings": roles}, "motion_program": mp,
                          "operation_node_ids": [op] if op else [], "priority": 10 + i, "witness_ids": cited})
     contradictions = list((prev or {}).get("contradictions", []))
     superseded = list((prev or {}).get("superseded_branches", []))
@@ -110,8 +201,19 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
         b["priority"] = 10 + i
         op = b["operation_node_ids"][0] if b["operation_node_ids"] else None
         b["clause_ids"] = [f"K-{did}-{i}@{op.split('.')[-1]}"] if op else []
-    missing = [rb for rb in required_branches if not any(all(br["when"].get(k) == str(v) for k, v in rb["conditions"].items())
-                                                         and set(br["operation_node_ids"]) & set(rb["operation_ids"]) for br in branches)]
+    # R3 F05: ONE branch must own the FULL required condition tuple; a branch that omits an axis counts only with a human-reviewed
+    # invariance for that axis (authority registry, >=2 witnesses) — never by combining disjoint partial branches.
+    def covers(br, rb):
+        if not set(br["operation_node_ids"]) & set(rb["operation_ids"]):
+            return False
+        for k, v in rb["conditions"].items():
+            if k in br["when"]:
+                if br["when"][k] != str(v):
+                    return False
+            elif not authority.invariance(did, k):
+                return False
+        return all(k in rb["conditions"] for k in br["when"])
+    missing = [rb for rb in required_branches if not any(covers(br, rb) for br in branches)]
     proposal = {"decision_id": did, "version": int((prev or {}).get("version", 0)) + 1,
                 "target_quality": question.get("exact_artistic_unknown", ""),
                 "branches": [{k: v for k, v in b.items() if k != "witness_ids"} for b in branches],
@@ -132,12 +234,28 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
         d["status"], d["research_only_reason"] = "RESEARCH_ONLY", f"BRANCHES_MISSING_FOR:{missing}"
     if any(c["status"].startswith("OPEN") for c in contradictions) and d["status"] != "RESEARCH_ONLY":
         d["status"], d["research_only_reason"] = "RESEARCH_ONLY", "OPEN_CONTRADICTION_NEEDS_DISCRIMINATING_EVIDENCE"
+    if policy_problems and d["status"] != "RESEARCH_ONLY":
+        d["status"], d["research_only_reason"] = "RESEARCH_ONLY", f"REFERENCE_POLICY:{policy_problems[0]['problem']}"
+    if any("op.audio_cue" in b["operation_node_ids"] for b in branches) and d["status"] != "RESEARCH_ONLY":
+        studied = [x for x in store.list("SourceAudioStudy") if x.get("status") == "AUDIO_SIGNAL_STUDIED_LOCALLY"
+                   and x["film_sha256"] in {w["film_sha256"] for w in wrecs}]
+        if not studied or not any(w.get("evidence_kind") == "AUDIO_SIGNAL" for w in wrecs):
+            d["status"], d["research_only_reason"] = "RESEARCH_ONLY", "AUDIO_UNSTUDIED (no local source-audio witness)"
+    if any(set(b["operation_node_ids"]) & set(CHARACTER_OPS) for b in branches) and d["status"] != "RESEARCH_ONLY":
+        films = {w["film_sha256"] for w in wrecs}
+        ok = [x for x in store.list("CharacterArtDossier") if x.get("status") == "VALIDATED" and set(x.get("films", [])) & films]
+        if not ok:                                   # Addendum 29: no character rule before a source-first drawn-entity study
+            d["status"], d["research_only_reason"] = "RESEARCH_ONLY", "CHARACTER_SOURCE_STUDY_MISSING"
+        else:
+            d["character_dossier_ids"] = sorted(x["dossier_id"] for x in ok)
     exemplars = [w["witness_id"] for w in wrecs if w["witness_id"] in cited]
     d.update(visual_truth="UNVERIFIED_UNTIL_ORIGINAL_ART_REVIEW", authored_from_question=question["question_id"],
              evidence_origin=wrecs[0].get("evidence_origin", "UNKNOWN"), authored_at=now_iso(),
              owned_choice_ids=sorted(set(owned_choice_ids) | set((prev or {}).get("owned_choice_ids", []))),
              phenomenon=phenomenon, identity_basis="PRODUCTION_CHOICE+PHENOMENON (not dimension tags)",
-             contradictions=contradictions, superseded_branches=superseded, exemplar_witness_ids=exemplars, reference_required=ref_required,
+             contradictions=contradictions, superseded_branches=superseded, exemplar_witness_ids=exemplars,
+             reference_required=any(b["mandatory_reference_role_ids"] for b in branches), reference_policy_problems=policy_problems,
+             authorized_witness_ids=sorted(authorized), source_art_review="UNREVIEWED (candidate until a human SOURCE_ART_REVIEW)",
              revision_of=(prev or {}).get("research_only_reason") if reopened else None,
              claim_state=("UNRESOLVED" if d["status"] == "RESEARCH_ONLY" else "METHOD_CANDIDATE"),
              observed_vs_inferred={"observed": [f.get("relation") for f in answer.get("SOURCE_VISIBLE_FACTS") or []],
@@ -167,13 +285,17 @@ def _package_references(staging: Path, usable: list[dict], exemplar_loader: Exem
     refs, problems = [], []
     for d in usable:
         for br in d["branches"]:
+            bind = {r["role_id"]: r for r in (br.get("reference_policy") or {}).get("role_bindings", [])}
             for role in br.get("reference_role_ids", []):
                 mandatory = role in (br.get("mandatory_reference_role_ids") or [])
-                wids = br.get("witness_ids") or d.get("exemplar_witness_ids") or []
-                if not wids or exemplar_loader is None:
+                rb = bind.get(role)
+                if rb is None:   # legacy role without a declared witness binding
+                    wids = br.get("witness_ids") or d.get("exemplar_witness_ids") or []
+                    rb = {"witness_id": sorted(wids)[0] if wids else None, "role": "legacy"}
+                if not rb.get("witness_id") or exemplar_loader is None:
                     problems.append({"role": role, "decision_id": d["decision_id"], "mandatory": mandatory, "reason": "NO_EXEMPLAR_SOURCE"})
                     continue
-                wid = sorted(wids)[0]
+                wid = rb["witness_id"]
                 try:
                     png, prov = exemplar_loader(wid)
                 except Blocked as b:
@@ -181,8 +303,9 @@ def _package_references(staging: Path, usable: list[dict], exemplar_loader: Exem
                     continue
                 sha = sha256_bytes(png)
                 atomic_write_bytes(staging / "references" / f"{sha}.png", png)
-                consent = consent_for(prov["film_sha256"]) if consent_for and prov.get("film_sha256") else None
-                refs.append({"ref_id": f"ref-{sha[:16]}-{digest(role)[:6]}", "role": role, "sha256": sha, "path": f"{sha}.png",
+                consent = consent_for(prov["film_sha256"], sha) if consent_for and prov.get("film_sha256") else None
+                refs.append({"ref_id": f"ref-{sha[:16]}-{digest(role)[:6]}", "role": role, "semantic_role": rb.get("role"), "sha256": sha,
+                             "path": f"{sha}.png",
                              "approved": bool(consent), "mandatory": mandatory, "decision_id": d["decision_id"], "branch_when": br["when"],
                              "source_witness_id": wid, "source_film_sha256": prov.get("film_sha256"), "evidence_kind": prov.get("evidence_kind"),
                              "frame_index": prov.get("frame_index"), "region": prov.get("region"),

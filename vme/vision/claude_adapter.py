@@ -29,7 +29,7 @@ DEFAULT_MODEL = "claude-opus-5-5"
 # Pricing as listed in the claude-api skill model table (cached 2026-11-03): $4 / $20 per MTok for claude-opus-5-5.
 # Recorded as UNVERIFIED until the user confirms; batch discount is NOT assumed.
 PRICE_TABLE_UNVERIFIED: dict[str, dict[str, Any]] = {"claude-opus-5-5": {"input_per_mtok": 4.0, "output_per_mtok": 20.0, "source": "claude-api skill table cached 2026-11-03"}}
-REQUEST_KINDS = ("frame_packet", "window_rationale", "question_answer", "native_detail")
+REQUEST_KINDS = ("frame_packet", "window_rationale", "question_answer", "native_detail", "character_dossier")
 
 
 def image_tokens_estimate(w: int, h: int) -> int:
@@ -127,10 +127,17 @@ class ClaudeBatchVisionAdapter:
         atomic_write_json(self._map_path(task_id), info)
 
     def request_json(self, task_id: str, kind: str, system: str, user_text: str, labelled_images: list[tuple[str, bytes, int, int]],
-                     *, source_shas: list[str], auth_task: str = "source_vision") -> dict:
+                     *, source_shas: list[str], auth_task: str = "source_vision", manifest: dict | None = None) -> dict:
         if kind not in REQUEST_KINDS:
             raise Blocked("UNKNOWN_REQUEST_KIND", kind)
         validate_custom_id(task_id)
+        # R3 F06/F09: every source request carries the verified manifest built by vision.dispatch.prepare_verified_request
+        if manifest is None:
+            raise Blocked("SOURCE_REQUEST_WITHOUT_VERIFIED_MANIFEST", f"{kind}: route through vme.vision.dispatch")
+        if manifest.get("system") != system or manifest.get("user_text") != user_text or manifest.get("kind") != kind:
+            raise Blocked("REQUEST_DIFFERS_FROM_VERIFIED_MANIFEST", task_id)
+        if [sha256_bytes(b) for _, b, _, _ in labelled_images] != [m["image_bytes_sha256"] for m in manifest["byte_manifest"]]:
+            raise Blocked("SENT_BYTES_DIFFER_FROM_MANIFEST", task_id)
         if len(labelled_images) > self.caps.max_images_per_request:
             raise Blocked("PROVIDER_IMAGE_LIMIT", f"{len(labelled_images)} > {self.caps.max_images_per_request}")
         mp = self._map_path(task_id)
@@ -159,7 +166,9 @@ class ClaudeBatchVisionAdapter:
                 "image_shas": [sha256_bytes(b) for _, b, _, _ in labelled_images], "images": len(labelled_images),
                 "estimated_cost_usd": est, "auth_id": a.auth_id, "authorization_version": a.issued_at,
                 "consent_scope": sorted(source_shas or []), "reservation_id": res["reservation_id"],
-                "transport_kind": self.transport_kind, "auth_task": auth_task, "attempted_at": now_iso(), "batch_id": None}
+                "transport_kind": self.transport_kind, "auth_task": auth_task, "attempted_at": now_iso(), "batch_id": None,
+                "manifest": {k: v for k, v in manifest.items() if k != "labelled_images"},
+                "evidence_status": list(manifest.get("evidence_status") or ["LOCAL_BYTES_VERIFIED"])}
         self._jw(task_id, info)                         # durable intent BEFORE create
         maybe_crash("vision_after_intent_before_create")
         try:
@@ -178,7 +187,8 @@ class ClaudeBatchVisionAdapter:
             self._liability(info, "create() raised after possible acceptance")
             raise Blocked("SUBMISSION_UNCERTAIN", f"{task_id}: create() raised {type(e).__name__}; acceptance unknown", task_id=task_id)
         maybe_crash("vision_after_create_before_save")
-        info.update(state="SUBMITTED", batch_id=batch.id, submitted_at=now_iso())
+        info.update(state="SUBMITTED", batch_id=batch.id, submitted_at=now_iso(),
+                    evidence_status=info.get("evidence_status", []) + ["SUBMITTED"])
         self._jw(task_id, info)
         return self._await(task_id)
 
@@ -240,7 +250,8 @@ class ClaudeBatchVisionAdapter:
                 self.registry.ledger.settle(info["reservation_id"], actual_cost=actual,
                                             receipt={"batch_id": info["batch_id"], "custom_id": task_id, "raw_sha256": sha256_file(rp)})
                 info.update(settled=True, cost_usd=actual, cost_basis="usage_tokens x unverified_price" if actual is not None else "UNKNOWN")
-            info.update(state="RESULT_RECEIVED", raw_path=str(rp), raw_sha256=sha256_file(rp))
+            info.update(state="RESULT_RECEIVED", raw_path=str(rp), raw_sha256=sha256_file(rp),
+                        evidence_status=[x for x in info.get("evidence_status", []) if x != "RESPONSE_RECEIVED"] + ["RESPONSE_RECEIVED"])
             self._jw(task_id, info)
             try:
                 parsed = self.parse_json_text(msg)
@@ -258,20 +269,40 @@ class ClaudeBatchVisionAdapter:
 
     # -- VisionProvider protocol (PacketRunner) ------------------------------------------------------
     def submit(self, task_id: str, request: dict, images: list[bytes]) -> dict:
+        """P1 every-frame packet through the verified dispatcher. The receipt carries what WE sent; the provider does not report an
+        image count, so none is asserted on its behalf (R3 F09)."""
         from PIL import Image
         import io
+        from .dispatch import image_entry, prepare_verified_request
+        from .prompt import _TEMPLATE
         frames = request["target_frames"] + request["context_frames"]
-        labelled = []
+        film = request.get("film_sha256")
+        if not film:
+            raise Blocked("PACKET_WITHOUT_SOURCE_SHA", request.get("packet_id", "?"))
+        ents = []
         for f, b in zip(frames, images):
             im = Image.open(io.BytesIO(b))
             role = "TARGET" if f in request["target_frames"] else "CONTEXT"
-            labelled.append((f"FRAME {f['frame_id']} [{role}] image_sha={f['image_sha']}", b, im.width, im.height))
-        source_shas = sorted({request["film_sha256"]}) if request.get("film_sha256") else []
-        user = json.dumps({k: request[k] for k in ("packet_id", "protocol", "binding", "target_frames", "context_frames", "active_questions",
-                                                   "prior_boundary_state", "required_output_schema") if k in request})
-        resp = self.request_json(task_id, "frame_packet", request["instructions"], user, labelled, source_shas=source_shas)
+            if sha256_bytes(b) != f["image_sha"]:
+                raise Blocked("LOCAL_IMAGE_BYTES_CHANGED", f["frame_id"])
+            ents.append(image_entry(role=role, png=b, witness_id=f["frame_id"], source_sha256=film, frame_index=int(f["frame_id"].split(":")[1]),
+                                    pts=f["pts_time"], width=im.width, height=im.height,
+                                    label=f"FRAME {f['frame_id']} [{role}] image_sha={f['image_sha']}"))
+        payload = {k: request[k] for k in ("packet_id", "target_frames", "context_frames", "active_questions", "prior_boundary_state",
+                                           "required_output_schema") if k in request}
+        b0 = request.get("binding") or {}
+        prep = prepare_verified_request(pass_id="P1", kind="frame_packet", shape=_TEMPLATE, source_shas=[film],
+                                        selection=b0.get("sequence") or {"packet_id": request.get("packet_id")}, images=ents,
+                                        prior_boundary=request.get("prior_boundary_state"), active_cluster=b0.get("active_cluster"),
+                                        controlling_problem=b0.get("controlling_problem"), competing_explanations=b0.get("current_competing_explanations"),
+                                        required_response=b0.get("required_response") or {"per_frame_records": True},
+                                        provider_profile={"model": self.caps.model_id, "max_images": self.caps.max_images_per_request,
+                                                          "max_output_tokens": self.max_output_tokens}, payload=payload)
+        resp = self.request_json(task_id, "frame_packet", prep["system"], prep["user_text"], prep["labelled_images"],
+                                 source_shas=[film], manifest=prep)
         if isinstance(resp, dict):
-            resp.setdefault("receipt", {})["images_received"] = resp["receipt"].get("images_sent")
+            resp.setdefault("receipt", {}).update(images_sent_locally=len(ents), provider_reported_image_count=None,
+                                                  receipt_basis="LOCAL_SUBMISSION_MANIFEST (provider gives no image acknowledgement)")
         return resp
 
     def query(self, task_id: str) -> dict | None:

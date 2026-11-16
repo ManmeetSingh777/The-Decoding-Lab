@@ -166,13 +166,16 @@ class PacketRunner:
             # instructions, image manifests and previous packet boundary match.
             # This check also protects old commit files when a current packet
             # fingerprint was carried over by an external caller.
-            tgt_, ctx_, _ = self._inputs(p)
-            prior_ = self.prior_boundary(p)
-            current_ = build_vision_request(p.packet_id, tgt_, ctx_, self.questions, prior_)
-            current_["film_sha256"] = p.film_sha256
-            saved_ = read_json(self.packet_dir(p) / "input.json")
-            if not saved_ or (saved_.get("request") or {}).get("request_sha") != current_["request_sha"]:
-                raise Blocked("STALE_SEMANTIC_PACKET_REQUIRES_NEW_ID", p.packet_id)
+            # The raw-frame identities are already inside the packet id (frame_manifest_sha); the request is rebuilt from the
+            # SAVED target/context byte manifest, so no frame needs re-decoding just to verify the cache (R3 F07).
+            ip = self.packet_dir(p) / "input.json"
+            saved_ = read_json(ip) if ip.exists() else None
+            if not saved_:
+                raise Blocked("STALE_SEMANTIC_PACKET_REQUIRES_NEW_ID", f"{p.packet_id}: no saved request")
+            current_ = build_vision_request(p.packet_id, saved_["targets"], saved_["context"], self.questions, self.prior_boundary(p))
+            if (saved_.get("request") or {}).get("request_sha") != current_["request_sha"]:
+                raise Blocked("STALE_SEMANTIC_PACKET_REQUIRES_NEW_ID",
+                              f"{p.packet_id}: instructions/questions/boundary changed since commit — raw evidence kept, new id required")
             return state
         if state in ("BLOCKED_CONSENT", "UNKNOWN_BILLING"):
             return state

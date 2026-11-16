@@ -10,3 +10,4 @@ render/remotion/public/
 *.log
 .env
 evidence_reuse/
+audit_build_v3/

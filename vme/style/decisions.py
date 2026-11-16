@@ -28,11 +28,14 @@ class DecisionBranch:
     operation_node_ids: list
     priority: int = 100
     mandatory_reference_role_ids: list | None = None   # None = legacy (all roles mandatory)
+    reference_policy: dict | None = None               # R3 F08: explicit REQUIRED | TEXT_ONLY_DEMONSTRATED | NOT_APPLICABLE | UNKNOWN
+    motion_program: dict | None = None                 # R3 F13: typed source-derived motion/camera/attention/world/audio choice
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        if d["mandatory_reference_role_ids"] is None:
-            d.pop("mandatory_reference_role_ids")
+        for k in ("mandatory_reference_role_ids", "reference_policy", "motion_program"):
+            if d[k] is None:
+                d.pop(k)
         return d
 
 

@@ -128,7 +128,7 @@ def ffprobe_verify(mp4: str | Path, expect: dict) -> dict:
 
 
 def render_video(scene: dict, assets: dict, out_mp4: str | Path, *, gate=None, run_id: str | None = None,
-                 diagnostic_label: str | None = None) -> dict:
+                 diagnostic_label: str | None = None, transition_on_success: bool = True) -> dict:
     """assets: {public_relative_src: local_path}. Integrated renders need gate.authorize_render."""
     probs = validate_scene_graph(scene)
     if probs:
@@ -175,18 +175,22 @@ def render_video(scene: dict, assets: dict, out_mp4: str | Path, *, gate=None, r
     # An mp4 merely existing is not a successful render. Keep diagnostic
     # transport runs distinguishable from an approved integrated film.
     if not verify.get("ok"):
+        if gate and run_id and diagnostic_label is None:
+            gate.transition(run_id, "ASSETS_APPROVED", reason="technical render failed")
         raise Blocked("TECHNICAL_RENDER_FAILED", str(verify.get("problems", [])))
     if diagnostic_label is None:
         expectation = (scene.get("motion_contract") or {}).get("expected_independent_motion")
         if expectation is None:
             raise Blocked("MOTION_CONTRACT_MISSING", "Integrated scene needs an independently reviewed motion expectation")
         if expectation is True and not motion.get("ok"):
+            if gate and run_id:
+                gate.transition(run_id, "ASSETS_APPROVED", reason="technical motion failed")
             raise Blocked("TECHNICAL_MOTION_FAILED", str(motion.get("verdict")))
         if expectation is False and not (scene.get("motion_contract") or {}).get("reviewed_static_intent_id"):
             raise Blocked("UNAPPROVED_STATIC_FILM", "No source-grounded intentional stillness evidence")
     rep = {"label": label, "mp4": str(out_mp4), "mp4_sha256": sha256_file(out_mp4), "ffprobe": verify, "motion": motion,
            "scene_sha": digest(scene), "rendered_at": now_iso(),
            "quality_claim": "TECHNICAL_RENDER_ONLY — not artistic motion quality"}
-    if gate and run_id and diagnostic_label is None:
+    if gate and run_id and diagnostic_label is None and transition_on_success:
         gate.transition(run_id, "AWAITING_VIDEO_REVIEW", reason="render complete")
     return rep

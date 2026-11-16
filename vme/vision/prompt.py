@@ -24,7 +24,8 @@ OUTPUT: strict schema, no natural-language summary instead of frame entries."""
 
 # Content-addressed semantics, not a manually-maintained version label.
 # Parser and image-transform digests are separately added by the runner.
-VISION_PROMPT_SHA = digest({"instructions": pass_instructions("P1") + "\n\n" + _TEMPLATE,
+P1_SYSTEM = pass_instructions("P1") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + _TEMPLATE   # exactly what vision.dispatch sends
+VISION_PROMPT_SHA = digest({"instructions": P1_SYSTEM,
                             "version": VISION_PROMPT_VERSION, "protocol_sha": PROTOCOL_SHA})
 
 
@@ -55,7 +56,7 @@ def build_vision_request(packet_id: str, target_manifest: list[dict], context_ma
         "prompt_content_sha": VISION_PROMPT_SHA,
         "protocol": binding["protocol"],
         "binding": binding,
-        "instructions": pass_instructions("P1") + chr(10) * 2 + _TEMPLATE,
+        "instructions": P1_SYSTEM,
         "packet_id": packet_id,
         "target_frames": [{"frame_id": m["frame_id"], "image_sha": m["image_sha"], "pts_time": m["pts_time"],
                            "order": i} for i, m in enumerate(target_manifest)],

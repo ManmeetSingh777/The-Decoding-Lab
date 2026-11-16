@@ -18,7 +18,7 @@ from ..util import Blocked, digest
 
 CUSTOM_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 KIND_PREFIX = {"frame_packet": "fp", "window_rationale": "wr", "question_answer": "qa", "native_detail": "nd",
-               "reinspection": "ri", "calibration": "cb"}
+               "reinspection": "ri", "calibration": "cb", "character_dossier": "ch"}
 
 
 def validate_custom_id(cid: str) -> str:

@@ -18,7 +18,7 @@ COVERAGE_STATUSES = (
 )
 PACKET_STATES = ("PLANNED", "INPUTS_READY", "REQUEST_IN_FLIGHT", "RESULT_RECEIVED", "VALIDATED",
                  "SEMANTIC_COMMITTED", "QUARANTINED", "RETRY_WAIT", "BLOCKED_CONSENT", "UNKNOWN_BILLING",
-                 "NEEDS_REINSPECTION")
+                 "NEEDS_REINSPECTION", "SUPERSEDED_BY_SPLIT")
 
 FRAME_OBSERVATION_FIELDS = (
     "frame_id", "source_sha", "pts_time", "request_id", "submitted_image_sha", "active_question_ids",

@@ -138,7 +138,7 @@ def exact_next_operation(ws: Workspace) -> dict:
             k, s, t = pend[0]
             return {"kind": "RECONCILE_PROVIDER_JOB", "job_key": k, "state": s, "task_uuid": t,
                     "command": f"vme resume --verify   # reconcile task {t} before any retry"}
-        pk = st.conn.execute("SELECT packet_id, pass_id, start_frame, state FROM packets WHERE state!='SEMANTIC_COMMITTED' "
+        pk = st.conn.execute("SELECT packet_id, pass_id, start_frame, state FROM packets WHERE state NOT IN ('SEMANTIC_COMMITTED','SUPERSEDED_BY_SPLIT') "
                              "ORDER BY film_sha256, pass_id, start_frame LIMIT 1").fetchone()
         if pk:
             return {"kind": "RUN_VISION_PACKET", "packet_id": pk[0], "pass_id": pk[1], "start_frame": pk[2], "state": pk[3],

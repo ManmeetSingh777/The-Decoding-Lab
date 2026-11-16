@@ -13,9 +13,13 @@ from ..util import digest
 DRILL_HUMAN = "TEST_FIXTURE_HUMAN_SIMULATION"
 
 
+DRILL_SOUND: dict = {}
+
+
 def drill_brief(brief_id: str = "BRIEF-DRILL-ANCHOR", subject: str = "deep-sea research explorer", kind: str = "biped",
-                env: str = "underwater", setting: str = "giant underwater observatory") -> dict:
-    return {"brief_id": brief_id, "shot_id": "drill-shot-1",
+                env: str = "underwater", setting: str = "giant underwater observatory", audio: dict | None = None) -> dict:
+    audio = audio if audio is not None else DRILL_SOUND
+    b = {"brief_id": brief_id, "shot_id": "drill-shot-1",
             "subjects": [{"id": "explorer", "noun": subject, "subject_kind": kind, "role": "focal", "content_attributes": []}],
             "actions": ["looks at a specimen chamber, turns to the viewer, grips the chamber handle"],
             "world": {"setting": setting, "environment": env}, "visual_focus": "explorer and chamber",
@@ -25,7 +29,8 @@ def drill_brief(brief_id: str = "BRIEF-DRILL-ANCHOR", subject: str = "deep-sea r
                       "view": "three_quarter", "subject_kind": kind, "environment": env, "original_prop": "specimen chamber handle"},
             "scope": {"subjects": [{"id": "explorer", "kind": "character", "subject_kind": kind, "role": "focal", "view": "three_quarter",
                                     "view_changes": ["front"], "face_visible": True, "contact_props": ["chamber_handle"], "lighting_changes": False}],
-                      "world": {"kind": env, "layers": True, "lighting": "directional"}},
+                      "world": {"kind": env, "layers": True, "lighting": "directional"},
+                      "camera": {"moves": True}, "audio_cues": [{"event_id": "e1"}]},
             "shot_plan": {"actions": [{"actor": "explorer", "event_id": "e1", "view": "front"},
                                       {"actor": "explorer", "event_id": "e2", "contact_prop": "chamber_handle", "hand_side": "right"}],
                           "events": [{"event_id": "e1", "actor": "explorer", "from": 20, "to": 39, "state": "view:front"},
@@ -36,6 +41,10 @@ def drill_brief(brief_id: str = "BRIEF-DRILL-ANCHOR", subject: str = "deep-sea r
                                       "directed_by": "DRILL brief author (fixture)"}],
                           "camera": [{"frame": 0, "x": 0, "y": 0, "scale": 1.0}, {"frame": 59, "x": 20, "y": 0, "scale": 1.05}],
                           "fps": 30, "frames": 60}}
+    if audio:
+        b["shot_plan"]["audio"] = {"required": True, "approved_asset_sha256": audio["sha256"], "asset_path": audio["path"],
+                                   "cues": [{"frame": 10, "kind": "DIRECTED_CUE"}]}
+    return b
 
 
 def build_drill_workspace(root: Path) -> dict:
@@ -49,7 +58,7 @@ def build_drill_workspace(root: Path) -> dict:
     from ..providers.authorization import AuthorizationRegistry, CONFIRM_PHRASE
     src = root / "drill_sources"
     for i in range(5):
-        make_clip(src / f"SYNTHETIC_DRILL_BASE_{i}.mp4", frames=30 + i, fps=30)   # distinct bytes per film
+        make_clip(src / f"SYNTHETIC_DRILL_BASE_{i}.mp4", frames=30 + i, fps=30, audio=True)   # distinct bytes per film
     make_sixth_clip(src / "SYNTHETIC_DRILL_SIXTH.mp4", segments=[("gray", 8), ("red", 14), ("blue", 10)], fps=30)
     ws = Workspace(root / "ws").ensure()
     lock = ingest(ws, src)
@@ -79,6 +88,16 @@ def build_drill_workspace(root: Path) -> dict:
     reg.issue(provider="runware", model_id="runware:400@4", task_categories=["image_generation", "capability_probe"], spend_cap_usd=5.0,
               issued_by=DRILL_HUMAN, confirm_phrase=CONFIRM_PHRASE, source_upload_consent=True, allowed_source_shas=shas,
               note="DRILL — simulated transport; exemplar references from synthetic drill films")
+    # an ORIGINAL, locally synthesized cue sound (not source audio), approved by the fixture human in the authority registry
+    from ..reference.audio import make_original_cue_asset
+    from ..state.authority import AuthorityRegistry
+    from ..util import sha256_file
+    snd = make_original_cue_asset(root / "drill_sound" / "original_cue.wav")
+    DRILL_SOUND.update(path=str(snd), sha256=sha256_file(snd))
+    st = ws.store()
+    AuthorityRegistry(st).issue("SOUND_ASSET_APPROVAL", scope={"asset_sha256": DRILL_SOUND["sha256"]}, verdict="APPROVED", by=DRILL_HUMAN,
+                                statement="DRILL — locally synthesized original tone, not derived from any source audio")
+    st.close()
     from ..loop.human import consent_reference_exemplars
     for sha in shas:
         consent_reference_exemplars(ws, film_sha=sha, by=DRILL_HUMAN, statement="DRILL — synthetic films generated locally")

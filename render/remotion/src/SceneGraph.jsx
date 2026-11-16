@@ -1,12 +1,22 @@
 import React from 'react';
-import {AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame} from 'remotion';
 
-// Interpolate one numeric property across keyframes [{frame, value}] (clamped, linear).
+// Interpolate one numeric property across keyframes [{frame, value, easing?}] (clamped).
+// R3 F13: the easing of each segment is taken from the keyframe that ENDS it, as compiled from a skill-owned motion program
+// ('hold' = stepped/held, 'ease_in_out' = cubic in-out). Keys without an easing (legacy / diagnostic scenes) interpolate linearly.
+const EASE = {ease_in_out: Easing.inOut(Easing.cubic)};
 const track = (keys, frame, prop, fallback) => {
-  const k = (keys || []).filter((x) => x[prop] !== undefined);
+  const k = (keys || []).filter((x) => x[prop] !== undefined).sort((a, b) => a.frame - b.frame);
   if (k.length === 0) return fallback;
-  if (k.length === 1) return k[0][prop];
-  return interpolate(frame, k.map((x) => x.frame), k.map((x) => x[prop]), {
+  if (k.length === 1 || frame <= k[0].frame) return k[0][prop];
+  if (frame >= k[k.length - 1].frame) return k[k.length - 1][prop];
+  let i = 0;
+  while (i < k.length - 1 && frame > k[i + 1].frame) i += 1;
+  const a = k[i];
+  const b = k[i + 1];
+  if (b.easing === 'hold') return frame >= b.frame ? b[prop] : a[prop];
+  return interpolate(frame, [a.frame, b.frame], [a[prop], b[prop]], {
+    easing: EASE[b.easing] || ((t) => t),
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -51,7 +61,8 @@ export const SceneGraphComposition = ({scene}) => {
   const frame = useCurrentFrame();
   const cx = track(scene.camera.keyframes, frame, 'x', 0);
   const cy = track(scene.camera.keyframes, frame, 'y', 0);
-  const cs = track(scene.camera.keyframes, frame, 'scale', 1);
+  const att = track((scene.attention || {}).keyframes, frame, 'scale', 1); // skill-owned attention emphasis (R3 F13)
+  const cs = track(scene.camera.keyframes, frame, 'scale', 1) * att;
   const roots = [...scene.layers].sort((a, b) => a.z - b.z);
   return (
     <AbsoluteFill style={{backgroundColor: scene.background || '#000000', overflow: 'hidden'}}>

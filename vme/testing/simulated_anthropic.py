@@ -95,7 +95,7 @@ class _Batches:
                 yield NS(custom_id=r["custom_id"], result=NS(type=self.mode, error={"type": "simulated"}))
                 continue
             text, stop = r["text"], "end_turn"
-            if self.mode == "truncated":
+            if self.mode == "truncated" or (self.mode == "truncate_over_4" and len(json.loads(text).get("frame_observations") or []) > 4):
                 text, stop = text[: len(text) // 2], "max_tokens"
             elif self.mode == "non_json":
                 text = "SIMULATED: I looked at the frames and they are nice."
@@ -161,7 +161,43 @@ def _respond(params) -> dict:
                 "uncertainty": ["SIMULATED: material cause not determinable from 720p pixels"], "phenomenon_dimensions": dims}
     if kind == "question_answer":
         return _answer(user, imgs)
+    if kind == "character_dossier":
+        return _dossier(user, imgs)
     return {}
+
+
+MOTION_OPS = {"op.motion_actor_track": "ACTOR_ACTING", "op.camera_attention": "CAMERA", "op.attention_focus": "ATTENTION",
+              "op.world_motion": "WORLD", "op.audio_cue": "AUDIO"}
+
+
+def _dossier(user, imgs) -> dict:
+    """SIMULATED Addendum-29 study: deterministic per real image statistics; every field cites a SUBMITTED witness id."""
+    ti = (user.get("binding") or {}).get("target_images") or []
+    states = [t["witness_id"] for t in ti if t["role"] == "TARGET"]
+    crop = [t["witness_id"] for t in ti if t["role"] == "NATIVE_CROP"]
+    con = [t["witness_id"] for t in ti if t["role"] == "CONTRAST"]
+    m = [_stats(b) for _, b in imgs]
+    f = lambda rel, imp, w: {"state": "OBSERVED", "visible_relation": f"SIMULATED: {rel}", "reconstruction_impact": f"SIMULATED: {imp}",
+                             "witness_ids": w, "precise_next_witness": ""}
+    fields = {"whole_design": f(f"the drawn entity reads as one dominant mass against the setting (mean {m[0]})", "draw one connected mass first", states[:2]),
+              "outer_contour_and_taper": f("the outer contour widens at the upper mass and narrows toward the lower edge while staying continuous",
+                                           "contour width changes along the segment, never a constant-width extrusion", states[:1] + crop[:1]),
+              "negative_spaces": f("a pocket of setting colour stays open between the mass and its extension", "keep the open pocket", states[:1]),
+              "visual_piece_junctions": f("pieces merge into the parent mass with no separate outline at the junction", "merge junctions", crop[:1] or states[:1]),
+              "fills_edges_materials": f("adjacent fill regions meet at a value step with no drawn outline between them, so the edge stays soft against the setting", "edge by value step", crop[:1] or states[:1]),
+              "lighting_and_shadows": f("one darker region follows the lower contour on the side away from the brighter setting area",
+                                        "shadow region follows the contour", states[:2]),
+              "view_and_pose_redraws": f("between the two states the contour is redrawn, not rotated", "needs a redrawn state asset", states[:2]),
+              "contact_and_occlusion": f("the near part overlaps the setting edge while the far part stays behind", "near/far layer order", states[:1]),
+              "world_integration": f("the entity's value range sits inside the setting's range with higher local contrast", "value-relative integration",
+                                     states[:1] + con[:1])}
+    if user.get("entity_id") == "sim_unknown_pose":
+        fields["view_and_pose_redraws"] = {"state": "UNKNOWN", "witness_ids": states[:1], "precise_next_witness": "a profile state of this entity"}
+    return {"study_basis": "SOURCE_FIRST_DRAWN_ENTITY", "entity_id": user.get("entity_id"), "fields": fields,
+            "identity_across_drawings": [{"witness_ids": states[:2], "what_persists": "SIMULATED: mass grouping and value roles",
+                                          "what_is_redrawn": "SIMULATED: outer contour"}],
+            "contrasting_examples": [{"witness_ids": con[:1], "difference": "SIMULATED: the contrast entity uses a different mass grouping"}],
+            "scope_class": "CONDITIONAL_STYLE_RULE"}
 
 
 def _frame_packet(user, imgs) -> dict:
@@ -198,7 +234,8 @@ def _frame_packet(user, imgs) -> dict:
         prev = m
     return {"frame_observations": obs,
             "packet_transition_graph": {"edges": [[a["frame_id"], b["frame_id"]] for a, b in zip(obs, obs[1:])]},
-            "boundary_state": {"scene_world": "SIMULATED", "active_objects": ["sim_focal"], "open_events": [], "attention": "UNKNOWN", "hypotheses": [],
+            "boundary_state": {"scene_world": "SIMULATED", "active_objects": [{"id": "sim_focal", "identity": "SIMULATED focal entity",
+                                                                               "drawing_state": "current"}], "open_events": [], "attention": "UNKNOWN", "hypotheses": [],
                                "open_questions": [q.get("question_id") for q in user["active_questions"]]},
             "reconciled_events": [{"event_id": e.get("event_id"), "resolution": "CONTINUES"} for e in (user.get("prior_boundary_state") or {}).get("open_events", [])],
             "question_update": None}
@@ -245,6 +282,21 @@ def _answer(user, imgs) -> dict:
             rev = f"; revised after {len(user['human_art_defects'])} rejected-art defect(s): the near contour is redrawn over the adjacent part"
         return (f"SIMULATED: draw the {{subject}} with {' and '.join(d.lower().replace('_', ' ') for d in dims)} decided together, "
                 f"keeping its connected parts separated from the {{setting}} by value grouping ({cond}){rev}")
-    base["BRANCHES"] = [{"when": rb["conditions"], "operation_id": rb["operation_ids"][0], "construction_action": action(rb)}
+    def policy(rb):
+        if any(d.startswith("CHARACTER") for d in dims) and rb["operation_ids"][0] not in MOTION_OPS:
+            roles = [{"role": "positive_view", "witness_id": wids[0]}] + ([{"role": "contrast", "witness_id": wids[1]}] if len(wids) > 1 else [])
+            return {"mode": "REQUIRED", "roles": roles, "reason": "SIMULATED: character construction needs visual exemplars"}
+        return {"mode": "NOT_APPLICABLE", "reason": "SIMULATED: decision carried by the relation clause; no exemplar conditioning claimed"}
+
+    def program(rb):
+        op = rb["operation_ids"][0]
+        if op not in MOTION_OPS:
+            return None
+        method = {"ACTOR_ACTING": "ANTICIPATE_OVERSHOOT", "CAMERA": "EASE_IN_OUT", "ATTENTION": "HOLD_THEN_MOVE", "WORLD": "EASE_IN_OUT",
+                  "AUDIO": "CUE_ON_EVENT"}[MOTION_OPS[op]]
+        return {"track_kind": MOTION_OPS[op], "method": method, "hold_ratio": 0.25, "anticipation_ratio": 0.12, "overshoot_ratio": 0.08,
+                "witness_ids": wids[:2]}
+    base["BRANCHES"] = [{"when": rb["conditions"], "operation_id": rb["operation_ids"][0], "construction_action": action(rb),
+                         "reference_policy": policy(rb), **({"MOTION_PROGRAM": program(rb)} if program(rb) else {})}
                         for rb in user["required_branches"]]
     return base

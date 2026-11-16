@@ -143,7 +143,7 @@ def reverse_plan(scope: OriginalScope) -> dict:
                 joints.append({"joint_id": f"{sid}:contact+light", "dimensions": ["CHARACTER_BODY_HAND_CONTACT", "MATERIAL_LIGHT_FINISH"],
                                "seed": "concurrent_action"})
             if s.get("actions"):
-                need(f"{sid}:acting", ["MOTION_ACTING"], f"{sid}:canonical", "motion_render", conditions=cond)
+                need(f"{sid}:acting", ["MOTION_ACTING"], f"{sid}:canonical", "motion_actor_track", conditions=cond)
         else:
             assets.append({"asset": f"{sid}:object", "kind": "PROP"})
             need(f"{sid}:design", ["ORIGINAL_SUBJECT_DESIGN", "SHAPE_SURFACE_DETAIL"], f"{sid}:object", "whole_scene", conditions=cond)
@@ -151,19 +151,23 @@ def reverse_plan(scope: OriginalScope) -> dict:
                            "seed": "part_to_whole"})
     cam = scope.camera or {}
     if cam.get("moves"):
-        need("camera:depth", ["DEPTH_VIEWPOINT"], "world_layers", "motion_render")
+        need("camera:depth", ["DEPTH_VIEWPOINT"], "world_layers", "camera_attention", conditions=dict(envc))
+        if w.get("layers"):
+            need("world:motion", ["WORLD_ASSEMBLY", "DEPTH_VIEWPOINT"], "world_layers", "world_motion", conditions=dict(envc))
+    if cam.get("attention_beats") or len([x for x in scope.subjects if x.get("kind") == "character"]) > 1:
+        need("attention:focus", ["SIMULTANEOUS_CHOREOGRAPHY"], "scene_graph", "attention_focus", conditions=dict(envc))
         if cam.get("scale_change"):
             need("camera:state_change", ["ART_STATE_TRANSFORMATION", "DEPTH_VIEWPOINT"], "whole_scene", "whole_scene")
             joints.append({"joint_id": "camera+art_states", "dimensions": ["DEPTH_VIEWPOINT", "ART_STATE_TRANSFORMATION"],
                            "seed": "transition_between_worlds"})
     if len({a for e in scope.events for a in e.get("actors", [])}) > 1:
-        need("events:choreography", ["SIMULTANEOUS_CHOREOGRAPHY"], "scene_graph", "motion_render")
+        need("events:choreography", ["SIMULTANEOUS_CHOREOGRAPHY"], "scene_graph", "motion_actor_track", conditions=dict(envc))
     if scope.transitions:
         need("transitions", ["TRANSITIONS_VISUAL_GRAMMAR"], "scene_graph", "motion_render")
     if scope.graphics:
         need("graphics", ["GRAPHICS_EXPLANATORY_VISUALS"], "graphics_layer", "layer_extract", salience="MEDIUM")
     if scope.audio_cues:
-        need("audio_timing", ["VISUAL_AUDIO_TIMING"], "scene_graph", "motion_render", salience="MEDIUM")
+        need("audio_timing", ["VISUAL_AUDIO_TIMING"], "scene_graph", "audio_cue", salience="HIGH", conditions=dict(envc))
     for f in scope.salient_features:
         need(f"salient:{f['feature']}", f["dimensions"], f.get("asset", "whole_scene"), f.get("operation", "whole_scene"),
              salience=f.get("salience", "HIGH"))

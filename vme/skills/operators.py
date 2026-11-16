@@ -32,6 +32,17 @@ OPERATORS: dict[str, dict] = {
                      "identity_reference_required": False},
     "op.motion_render": {"kind": "motion_render", "backend": "renderer", "requires": ["remotion", "ffmpeg"],
                          "outputs": ["MP4"], "identity_reference_required": False},
+    # R3 F13/F14 — typed, skill-owned non-image operations consumed by vme.render.motion_program / vme.reference.audio
+    "op.motion_actor_track": {"kind": "motion_actor_track", "backend": "renderer", "requires": ["remotion"], "outputs": ["ACTOR_TRACK"],
+                              "identity_reference_required": False, "consumer": "vme.render.motion_program:compile_event_program"},
+    "op.camera_attention": {"kind": "camera_attention", "backend": "renderer", "requires": ["remotion"], "outputs": ["CAMERA_TRACK"],
+                            "identity_reference_required": False, "consumer": "vme.render.motion_program:compile_event_program"},
+    "op.attention_focus": {"kind": "attention_focus", "backend": "renderer", "requires": ["remotion"], "outputs": ["ATTENTION_TRACK"],
+                           "identity_reference_required": False, "consumer": "vme.render.motion_program:compile_event_program"},
+    "op.world_motion": {"kind": "world_motion", "backend": "renderer", "requires": ["remotion"], "outputs": ["WORLD_TRACK"],
+                        "identity_reference_required": False, "consumer": "vme.render.motion_program:compile_event_program"},
+    "op.audio_cue": {"kind": "audio_cue", "backend": "audio", "requires": ["ffmpeg"], "outputs": ["AUDIO_CUE_TRACK"],
+                     "identity_reference_required": False, "consumer": "vme.reference.audio:build_cue_track"},
 }
 
 PROVIDER_OPERATION_KINDS = ("whole_scene", "world_plate", "canonical_character", "guided_pose_edit", "region_edit", "clean_plate")

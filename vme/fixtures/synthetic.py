@@ -21,7 +21,7 @@ SYNTHETIC_FILM_B = "SYNTHETIC_FILM_B_" + "b" * 47
 SYNTHETIC_FILM_C = "SYNTHETIC_FILM_C_" + "c" * 47
 
 
-def make_clip(path: str | Path, *, frames: int = 24, fps: int = 60, size: str = "160x90", vfr: bool = False) -> Path:
+def make_clip(path: str | Path, *, frames: int = 24, fps: int = 60, size: str = "160x90", vfr: bool = False, audio: bool = False) -> Path:
     ff = require_tool("ffmpeg")
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -34,6 +34,10 @@ def make_clip(path: str | Path, *, frames: int = 24, fps: int = 60, size: str = 
         cmd = [ff, "-v", "error", "-y", "-f", "lavfi", "-i", f"testsrc2=size={size}:rate={fps}:duration={dur}",
                "-vf", f"trim=end_frame={frames},setpts='if(lt(N,{half}),N,{half}+(N-{half})*3)/({fps}*TB)'",
                "-fps_mode", "passthrough", "-enc_time_base", f"1/{fps}"]
+    if audio:   # SYNTHETIC beeps (generated locally) so the source-audio study path executes offline; inputs precede filters
+        vi = cmd.index("-vf")
+        cmd = cmd[:vi] + ["-f", "lavfi", "-i", f"aevalsrc=0.5*sin(2*PI*440*t)*lt(mod(t\\,0.2)\\,0.04):s=16000:d={dur}"] + cmd[vi:] + \
+            ["-map", "0:v:0", "-map", "1:a:0", "-c:a", "aac", "-shortest"]
     cmd += ["-pix_fmt", "yuv420p", "-c:v", "libx264", "-g", "12", str(path)]
     out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if out.returncode != 0:
