@@ -947,7 +947,8 @@ class RealLoopRunner:
             prev = st.get("CharacterArtDossier", did)
             if prev and prev.get("status") == "VALIDATED":
                 continue
-            seqs, picks = set(), []
+            seqs: set = set()
+            picks: list = []
             for seq, k, reg in sorted(frames, key=lambda x: (x[0], x[1])):
                 if seq not in seqs or len(picks) < 2:
                     if (seq, k) not in [(x[0], x[1]) for x in picks]:
@@ -1290,7 +1291,7 @@ class RealLoopRunner:
 
     @staticmethod
     def _actor_slots(brief: dict, actor: dict) -> dict:
-        subj = next((x for x in brief.get("subjects", []) if x.get("id") == actor["id"]), {})
+        subj: dict = next((x for x in brief.get("subjects", []) if x.get("id") == actor["id"]), {})
         out = {"subject": subj.get("noun") or brief["slots"].get("subject")}
         for k in ("subject_kind", "view", "role"):
             if actor.get(k):

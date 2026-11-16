@@ -151,7 +151,7 @@ def run(out: Path, only: list[str] | None = None, canary_root: str | None = None
                 continue
             needs_canary = sel.startswith("CANARY:")
             sel = sel.split(":", 1)[1] if needs_canary else sel
-            row = {"id": mid, "guard": guard, "file": rel, "selector": sel}
+            row: dict = {"id": mid, "guard": guard, "file": rel, "selector": sel}
             if needs_canary and not canary_root:
                 rows.append({**row, "result": "NOT_RUN", "why": "needs --canary-root (a driven two-actor canary workspace)"})
                 continue

@@ -109,7 +109,7 @@ def source_art_ledger(st, ws, run_id: str, intervals: list[tuple], pass_id: str)
                                   (film, f"{run_id}-native", a, b)).fetchone()[0]
         phen = [x for x in st.list("VisualPhenomenon") if any(s["sequence_id"] == seq for s in x.get("sightings", []))]
         dos = [d for d in dossiers if film in d.get("films", []) and d.get("entity_id") in entities]
-        open_gaps = []
+        open_gaps: list[dict] = []
         missing = [i for i in range(a, b + 1) if i not in bound]
         if missing:
             open_gaps.append({"kind": "TARGET_FRAMES_NOT_IDENTITY_BOUND", "frames": missing[:20], "next": "run the packet(s) covering them"})

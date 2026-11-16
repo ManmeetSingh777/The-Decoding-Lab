@@ -290,7 +290,7 @@ def derive_clause_template(construction_action: str) -> str:
 
 
 ExemplarLoader = Callable[[str], tuple[bytes, dict]]     # witness_id -> (png bytes, provenance)
-ConsentLookup = Callable[[str], dict | None]             # film_sha -> consent record or None
+ConsentLookup = Callable[[str, str], dict | None]        # (film_sha, exemplar image sha) -> consent record or None
 
 
 def _package_references(staging: Path, usable: list[dict], exemplar_loader: ExemplarLoader | None,

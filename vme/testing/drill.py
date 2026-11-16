@@ -19,7 +19,7 @@ DRILL_SOUND: dict = {}
 def drill_brief(brief_id: str = "BRIEF-DRILL-ANCHOR", subject: str = "deep-sea research explorer", kind: str = "biped",
                 env: str = "underwater", setting: str = "giant underwater observatory", audio: dict | None = None) -> dict:
     audio = audio if audio is not None else DRILL_SOUND
-    b = {"brief_id": brief_id, "shot_id": "drill-shot-1",
+    b: dict = {"brief_id": brief_id, "shot_id": "drill-shot-1",
             "subjects": [{"id": "explorer", "noun": subject, "subject_kind": kind, "role": "focal", "content_attributes": []}],
             "actions": ["looks at a specimen chamber, turns to the viewer, grips the chamber handle"],
             "world": {"setting": setting, "environment": env}, "visual_focus": "explorer and chamber",
@@ -52,7 +52,7 @@ def two_actor_brief(brief_id: str = "BRIEF-CANARY-2ACTOR", audio: dict | None = 
     """R3 offline canary: a NOVEL original two-actor scene — distinct identities, a hand/prop contact, overlapping actions, view change,
     camera + attention beats, world layers and an audio cue. Content only (the brief never carries style)."""
     audio = audio if audio is not None else DRILL_SOUND
-    b = {"brief_id": brief_id, "shot_id": "canary-shot-1",
+    b: dict = {"brief_id": brief_id, "shot_id": "canary-shot-1",
          "subjects": [{"id": "keeper", "noun": "lighthouse keeper with a brass lantern", "subject_kind": "biped", "role": "focal", "content_attributes": []},
                       {"id": "moth", "noun": "giant friendly moth", "subject_kind": "creature", "role": "secondary", "content_attributes": []}],
          "actions": ["the keeper lifts the lantern while the moth circles and turns toward the light"],

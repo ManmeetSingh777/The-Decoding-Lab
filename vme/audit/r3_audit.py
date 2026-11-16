@@ -31,6 +31,9 @@ R3_ZIP = ROOT.parent / "VME_V13_ONE_PASS_END_TO_END_REPAIR_R3.zip"
 PRE_R3_BASE = "516af70"
 PY = sys.executable
 MEDIA_OK = {"integrated.mp4", "integrated_video_only.mp4"}          # ORIGINAL synthetic canary renders, never source media
+# assembled at runtime so this source (and DELTA.patch, which contains it) never matches its own secret scan
+_SECRET_MARKERS = tuple("".join(x) for x in (("sk-", "ant-", "api"), ("RUNWARE_", "API_KEY", "="), ("x-", "api-", "key:")))
+SPEC = ROOT.parent / "Visual_Mastery_Engine_Build_Spec_v1_3"
 
 
 def _git(*a) -> str:
@@ -120,7 +123,7 @@ def canary_evidence(out: Path, root: Path, drv: dict) -> dict:
     from ..style.coverage import OriginalScope
     ws = drv["ws"]
     st = ws.store()
-    o = {s: (st.get("LoopTransition", f"REAL-CANARY:{s}") or {}).get("outputs") for s in ("S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")}
+    o: dict = {s: (st.get("LoopTransition", f"REAL-CANARY:{s}") or {}).get("outputs") or {} for s in ("S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")}
     prog = st.get("EventProgram", "REAL-CANARY")
     jobs = {r["job_id"]: r for r in st.list("CompiledImageJob")}
     brief = st.get("OriginalBrief", "BRIEF-CANARY-2ACTOR")["brief"]
@@ -372,8 +375,10 @@ def build(out_zip: Path, keep: bool = False) -> dict:
     if _git("status", "--porcelain").strip():
         raise SystemExit("REFUSED: working tree is dirty; commit first so every result belongs to one HEAD\n" + _git("status", "--short"))
     head = _git("rev-parse", "HEAD").strip()
-    b = ROOT / "audit_build_r3"
+    # the build directory lives OUTSIDE the repo: the repo suite scans ROOT and must never see the fresh suite's temp files
+    b = ROOT.parent / "_vme_r3_audit_build"
     _rm(b)
+    _rm(ROOT / "audit_build_r3")
     out, work = b / "audit", b / "work"
     out.mkdir(parents=True)
     work.mkdir()
@@ -386,6 +391,9 @@ def build(out_zip: Path, keep: bool = False) -> dict:
     fx = work / "fresh" / "visual-mastery-engine"
     with zipfile.ZipFile(arch) as z:
         z.extractall(fx)
+    # the authoritative spec is a SIBLING of the repo (not in git); the fresh environment gets the same sibling copy (no ZIPs)
+    if SPEC.exists():
+        shutil.copytree(SPEC, fx.parent / SPEC.name, ignore=shutil.ignore_patterns("*.zip", "__pycache__"))
     nm = ROOT / "render" / "remotion" / "node_modules"
     if nm.exists() and (fx / "render" / "remotion").exists():
         subprocess.run(["cmd", "/c", "mklink", "/J", str(fx / "render" / "remotion" / "node_modules"), str(nm)], capture_output=True)
@@ -433,18 +441,19 @@ def build(out_zip: Path, keep: bool = False) -> dict:
         if (ROOT / "docs" / f).exists():
             shutil.copy(ROOT / "docs" / f, out / f)
     # assemble with a self-check: no source films, no decoded source frames, no secrets
-    files, bad = [], []
+    files: list[dict] = []
+    bad: list[str] = []
     tmp = out_zip.with_suffix(".tmp.zip")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in sorted(out.rglob("*")):
-            if not p.is_file():
+        for fp in sorted(out.rglob("*")):
+            if not fp.is_file():
                 continue
-            arc = p.relative_to(out).as_posix()
-            if p.suffix.lower() in (".mp4", ".mov", ".mkv", ".wav") and p.name not in MEDIA_OK:
+            arc = fp.relative_to(out).as_posix()
+            if fp.suffix.lower() in (".mp4", ".mov", ".mkv", ".wav") and fp.name not in MEDIA_OK:
                 bad.append(arc)
                 continue
-            z.write(p, arc)
-            files.append({"path": arc, "sha256": _sha(p), "bytes": p.stat().st_size})
+            z.write(fp, arc)
+            files.append({"path": arc, "sha256": _sha(fp), "bytes": fp.stat().st_size})
         z.writestr("SHA256_MANIFEST.json", json.dumps({"commit": head, "files": files, "never_included": [
             "source film bytes", "decoded source frames", "API keys / secrets", ".venv", "node_modules", "paid provider media"],
             "excluded_media": bad}, indent=1))
@@ -453,7 +462,7 @@ def build(out_zip: Path, keep: bool = False) -> dict:
         for n in z.namelist():
             if n.endswith((".json", ".md", ".txt", ".log", ".patch")):
                 t = z.read(n).decode("utf-8", "replace")
-                if any(k in t for k in ("sk-ant-api", "RUNWARE_API_KEY=", "x-api-key:")):
+                if any(k in t for k in _SECRET_MARKERS):
                     secret_hits.append(n)
     if secret_hits:
         tmp.unlink()
