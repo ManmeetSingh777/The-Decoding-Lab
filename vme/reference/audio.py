@@ -117,6 +117,53 @@ def build_cue_track(asset: str | Path, cue_frames: list[int], *, fps: float, fra
     return out_wav
 
 
+AUDIO_LAYERS = ("NARRATION", "MUSIC", "SFX")
+
+
+def build_layered_audio(layers: dict, cues: list[dict], *, mix_policy: dict, fps: float, frames: int, out_wav: str | Path,
+                        approved: callable = None) -> dict:
+    """R3-C06 original production: each cue plays ITS layer's own approved original asset (never one tone for everything), each layer
+    is gained by the declared mix policy, layers are summed on a bed exactly as long as the video. Refuses: a cue whose layer has no
+    approved asset, a layer without a declared gain, reuse of one asset for two different layers (no fake layering)."""
+    from ..util import sha256_file
+    if not cues:
+        raise Blocked("NO_AUDIO_CUES", "audio required but the event program scheduled no cue")
+    used = sorted({c["layer"] for c in cues})
+    bad = [l for l in used if l not in AUDIO_LAYERS]
+    if bad:
+        raise Blocked("AUDIO_LAYER_UNKNOWN", str(bad))
+    for l in used:
+        a = layers.get(l)
+        if not a or not Path(a["path"]).exists():
+            raise Blocked("NO_APPROVED_SOUND_ASSET", f"layer {l} has no original asset")
+        if sha256_file(a["path"]) != a["sha256"] or (approved and not approved(a["sha256"])):
+            raise Blocked("NO_APPROVED_SOUND_ASSET", f"layer {l}: bytes changed or no human SOUND_ASSET_APPROVAL")
+        if l not in (mix_policy or {}).get("gain_db", {}):
+            raise Blocked("MIX_POLICY_UNDECLARED", f"no gain declared for layer {l}")
+    shas = [layers[l]["sha256"] for l in used]
+    if len(set(shas)) != len(shas):
+        raise Blocked("ONE_ASSET_FAKING_SEVERAL_LAYERS", "each layer needs its own original asset")
+    ff = require_tool("ffmpeg")
+    out_wav = Path(out_wav)
+    out_wav.parent.mkdir(parents=True, exist_ok=True)
+    dur = frames / fps
+    inputs = ["-f", "lavfi", "-t", f"{dur:.6f}", "-i", f"anullsrc=r={SR}:cl=mono"]
+    filt, labels = [], ["[0:a]"]
+    for i, c in enumerate(sorted(cues, key=lambda c: (c["frame"], c["cue_id"]))):
+        inputs += ["-i", str(layers[c["layer"]]["path"])]
+        ms = int(round(int(c["frame"]) / fps * 1000))
+        g = float(mix_policy["gain_db"][c["layer"]])
+        filt.append(f"[{i + 1}:a]aresample={SR},aformat=channel_layouts=mono,volume={g}dB,adelay={ms}[c{i}]")
+        labels.append(f"[c{i}]")
+    filt.append("".join(labels) + f"amix=inputs={len(labels)}:normalize=0,atrim=0:{dur:.6f}[out]")
+    r = subprocess.run([ff, "-v", "error", "-y", *inputs, "-filter_complex", ";".join(filt), "-map", "[out]", "-ar", str(SR), str(out_wav)],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0:
+        raise Blocked("AUDIO_TRACK_BUILD_FAILED", r.stderr[-400:])
+    return {"wav": str(out_wav), "layers_used": used, "cues": len(cues), "mix_policy": mix_policy,
+            "per_layer_cue_frames": {l: sorted(c["frame"] for c in cues if c["layer"] == l) for l in used}}
+
+
 def mux(video: str | Path, wav: str | Path, out_mp4: str | Path) -> Path:
     ff = require_tool("ffmpeg")
     r = subprocess.run([ff, "-v", "error", "-y", "-i", str(video), "-i", str(wav), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",

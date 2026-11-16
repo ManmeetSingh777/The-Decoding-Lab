@@ -200,12 +200,22 @@ def _words(s) -> int:
     return len(str(s).split())
 
 
+def _grounded_reason(r) -> bool:
+    """An N/A reason explains what IS visible that makes a dimension irrelevant: specific (>=5 words) and not adjective filler.
+    (It is not held to the relation vocabulary — 'only one entity is visible, so no overlap exists' is an explanation, not a relation.)"""
+    from ..util import VAGUE_TERMS
+    if not isinstance(r, str) or _words(r) < 5:
+        return False
+    t = r.lower()
+    rest = [w for w in t.replace(",", " ").split() if len(w) > 3 and not any(v in w for v in VAGUE_TERMS)]
+    return len(rest) >= 3
+
+
 def _addressing(v) -> str:
     """SUBSTANTIVE | NOT_APPLICABLE | EXPLICIT_UNKNOWN | UNADDRESSED (a bare 'UNKNOWN', null, [] or {} addresses nothing)."""
     if isinstance(v, dict):
         if "not_applicable" in v:
-            r = v["not_applicable"]
-            return "NOT_APPLICABLE" if isinstance(r, str) and _words(r) >= 4 and not is_vague_statement(r) else "UNADDRESSED"
+            return "NOT_APPLICABLE" if _grounded_reason(v["not_applicable"]) else "UNADDRESSED"
         if "unknown" in v:
             return "EXPLICIT_UNKNOWN" if _words(v.get("unknown", "")) >= 3 and str(v.get("next_witness", "")).strip() else "UNADDRESSED"
         return "SUBSTANTIVE" if any(_addressing(x) == "SUBSTANTIVE" for x in v.values()) else "UNADDRESSED"

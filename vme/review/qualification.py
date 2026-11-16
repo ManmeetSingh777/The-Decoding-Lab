@@ -34,6 +34,42 @@ def review_source_claim(store, decision_id: str, *, verdict: str, by: str, state
     return rec
 
 
+# R3-C11: four SEPARATE readiness stages; each needs its own evidence and none is inferred from another
+READINESS_STAGES = ("ENGINEERING_READY_FOR_SOURCE_CALIBRATION", "SOURCE_INVESTIGATION_COMPLETED_AND_REVIEWED",
+                    "SKILLS_ORIGINAL_TRIAL_PROVEN", "HELDOUT_ORIGINAL_AV_QUALIFIED")
+HELDOUT_AV_REQUIREMENTS = ("contiguous original brief >= 120 s, unseen before skill freeze", "two or more unlike subjects",
+                           "expressive character states / contacts", "concurrent events and choreography", "environment / camera / attention",
+                           "narration + music + SFX as separate approved layers", "frame-by-frame visual QA", "blind comparison by a human",
+                           "negative tests and source-to-skill causality on the final film", "no per-scene patches")
+
+
+def readiness_report(store, *, engineering: dict, calibration_state: dict | None = None) -> dict:
+    """engineering = {"repo_suite_failed": int, "fresh_suite_failed": int, "mutants_survived": int, "red_before_closed": bool,
+    "static_clean": bool}. Every stage is computed from its OWN evidence; a later stage is never PASS while an earlier one is not."""
+    from ..state.authority import AuthorityRegistry
+    auth = AuthorityRegistry(store)
+    eng_ok = (engineering.get("repo_suite_failed") == 0 and engineering.get("fresh_suite_failed") == 0 and
+              engineering.get("mutants_survived") == 0 and engineering.get("red_before_closed") is True and engineering.get("static_clean") is True)
+    cal = (calibration_state or {}).get("status", "AWAITING_AUTHORIZED_SOURCE_TRANSFER")
+    ledgers = [x for x in store.list("SourceArtLedger") if x.get("scenes")]
+    real_ledgers = [x for x in ledgers if not str(x.get("run_id", "")).startswith(("REAL-DRILL", "REAL-CANARY", "REAL-CAP"))]
+    src_ok = bool(real_ledgers) and all(x.get("complete_for_promotion") and all(s["source_art_truth"] == "SOURCE_ART_REVIEWED" for s in x["scenes"])
+                                        for x in real_ledgers)
+    quals = [q for q in store.list("VisualQualification") if q.get("status") == "HUMAN_VISUALLY_APPROVED" and q.get("evidence_origin") == "REAL_VLM"]
+    trial_ok = bool(quals) and all(auth.get("VISUAL_QUALIFICATION", {"qualification_id": q["qualification_id"]}) for q in quals)
+    heldout = [h for h in store.list("HeldoutAVQualification") if h.get("status") == "HUMAN_APPROVED_ALL_REQUIREMENTS"]
+    stages = {
+        "ENGINEERING_READY_FOR_SOURCE_CALIBRATION": "PASS" if eng_ok else "FAIL",
+        "SOURCE_INVESTIGATION_COMPLETED_AND_REVIEWED": ("PASS" if eng_ok and src_ok else
+                                                       f"BLOCKED:{cal}" if cal.startswith("AWAITING") else "NOT_MET"),
+        "SKILLS_ORIGINAL_TRIAL_PROVEN": "PASS" if eng_ok and src_ok and trial_ok else "NOT_MET",
+        "HELDOUT_ORIGINAL_AV_QUALIFIED": "PASS" if eng_ok and src_ok and trial_ok and heldout else "NOT_MET",
+    }
+    return {"stages": stages, "calibration": cal, "ready_for_15_plus_1": stages["ENGINEERING_READY_FOR_SOURCE_CALIBRATION"] == "PASS"
+            and cal == "CALIBRATION_PASSED_AND_REVIEWED", "heldout_requirements": list(HELDOUT_AV_REQUIREMENTS),
+            "note": "READY_FOR_15_PLUS_1 additionally needs one authorised real-source calibration judged by an independent reviewer"}
+
+
 def capability_verdict(store, run_id: str) -> dict:
     t = {x["stage"]: x for x in store.list("LoopTransition") if x["run_id"] == run_id}
     origin = next((x.get("evidence_origin") for x in t.values()), "UNKNOWN")

@@ -20,6 +20,17 @@ FOURTH: for EACH target frame emit a typed FrameObservation with the exact frame
 FIFTH (Steps F-H): emit a PacketTransitionGraph of linked simultaneous changes, reconcile every open event from the prior boundary state, list visually significant elements NOT explained by the current model (dimension extensions allowed), and the single unanswered HIGH-IMPACT question the next source frames/crops should resolve.
 DO NOT: use "vibrant", "dynamic", "professional", "clean vector" as standalone explanations; write fixed palettes/character coordinates as universal style; infer proprietary source tooling; hide missing frames; repeat empty prose; confuse character-art changes with camera motion; invent unseen features.
 IF visual evidence is inadequate, state UNKNOWN + exact missing image/viewpoint.
+ADEQUACY CONTRACT (each frame is graded per dimension; field presence is not depth):
+- actually_visible_actor_and_object_ids lists every visible actor/object with a stable id; entity_kinds maps each id to character|object|world;
+  if nothing is visible give no_visible_entities_reason.
+- visible_design_relations: at least one relation per visible entity, each with entity_ids and dimensions.
+- character_face_limb_contact_state, visible_layer_depth_attention_state, camera_vs_actor_vs_drawing_state, material_finish_or_colour_change,
+  simultaneous_event_links: each is either a specific observation, or {"not_applicable": "<what is visible that makes it irrelevant>"}, or
+  {"unknown": "<what cannot be decided>", "next_witness": "<exact frame/crop that would decide it>"}. A bare "UNKNOWN" addresses nothing.
+- every changed_since_prior_frame entry names entity_ids and what changed; a changed character needs a relation in the state/face/contact/
+  viewpoint dimensions; two changing entities need simultaneous_event_links.
+- a target frame whose manifest lists audio_events (local energy onsets — NOT meaning) needs audiovisual_links stating which visible
+  event, if any, coincides with it.
 OUTPUT: strict schema, no natural-language summary instead of frame entries."""
 
 # Content-addressed semantics, not a manually-maintained version label.
@@ -59,7 +70,8 @@ def build_vision_request(packet_id: str, target_manifest: list[dict], context_ma
         "instructions": P1_SYSTEM,
         "packet_id": packet_id,
         "target_frames": [{"frame_id": m["frame_id"], "image_sha": m["image_sha"], "pts_time": m["pts_time"],
-                           "order": i} for i, m in enumerate(target_manifest)],
+                           "order": i, **({"audio_events": m["audio_events"]} if m.get("audio_events") else {})}
+                          for i, m in enumerate(target_manifest)],
         "context_frames": [{"frame_id": m["frame_id"], "image_sha": m["image_sha"], "pts_time": m["pts_time"],
                             "role": "CONTEXT_NOT_TARGET"} for m in context_manifest],
         "active_questions": active_questions,

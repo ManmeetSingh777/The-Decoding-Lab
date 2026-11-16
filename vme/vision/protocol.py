@@ -128,6 +128,9 @@ _RELATIONAL = re.compile(r"\b(while|as|relative to|against|behind|in front of|ov
                          r"stays|persist|than|across|between|follows|before|after)\b", re.I)
 
 
+WHOLE_ILLUSTRATION_OPS = ("op.whole_scene", "op.canonical_character", "op.world_plate")
+
+
 def assess_sufficiency(answer: dict, *, producing_operator: str | list, known_witness_ids: set[str]) -> dict:
     """Is this answer able to control a producing choice? Field presence is NOT enough. Returns verdict + reasons.
 
@@ -152,6 +155,19 @@ def assess_sufficiency(answer: dict, *, producing_operator: str | list, known_wi
         reasons.append("BRANCH_ACTION_IS_ADJECTIVE_ONLY")
     if not answer.get("REMAINING_UNKNOWN") and answer.get("answer_status") != "OBSERVED":
         reasons.append("NO_DECLARED_UNKNOWNS_FOR_AN_INFERRED_ANSWER")
+    # R3-C10: lexical relationality is not construction-grade sufficiency for a WHOLE-ILLUSTRATION operation. One witnessed overlap
+    # may be an authentic narrow rule, but it cannot specify how a whole scene/character/world is built.
+    whole = [b for b in brs if b.get("operation_id") in WHOLE_ILLUSTRATION_OPS]
+    if whole:
+        wit = {w for f in relational for w in f.get("witness_ids") or [] if w in known_witness_ids}
+        if len(relational) < 2 or len(wit) < 2:
+            reasons.append("WHOLE_ILLUSTRATION_NEEDS_MULTIPLE_WITNESSED_RELATIONS")
+        if not [x for x in answer.get("WHEN_NOT_APPLICABLE") or [] if str(x).strip()]:
+            reasons.append("NO_APPLICABILITY_LIMITS_OR_EXCEPTIONS")
+        # construction-grade = written as a transferable operation for a NEW subject (placeholders, not source nouns) and specific
+        if any(len(str(b.get("construction_action", "")).split()) < 12 or
+               not ("{subject}" in str(b.get("construction_action", "")) or "{setting}" in str(b.get("construction_action", ""))) for b in whole):
+            reasons.append("CONSTRUCTION_ACTION_NOT_CONSTRUCTION_GRADE")
     return {"verdict": "SUFFICIENT_FOR_PRODUCING_CHOICE" if not reasons else "INSUFFICIENT_FOR_PRODUCING_CHOICE", "reasons": reasons,
             "cited_fact_count": len(cited), "relational_fact_count": len(relational)}
 

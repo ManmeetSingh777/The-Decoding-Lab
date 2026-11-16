@@ -62,6 +62,60 @@ def validate_character_art_study(dossier: dict, authorized: set[str]) -> list[st
     return p
 
 
+def character_state_inventory(entity_id: str, frames: list[tuple]) -> list[dict]:
+    """R3-C09: distinct OBSERVED states of one drawn entity, in time order, from the committed per-frame records
+    [(seq, frame_index, region, observation)]. A new state starts when the drawing-state ids, contact, face/view or occlusion signature
+    changes, or a new drawing is reported for this entity. Hard cases (contact / occlusion / redraw / face-view) are flagged."""
+    from ..vision.contracts import _addressing
+    inv: list[dict] = []
+    last = None
+    for seq, k, reg, o in sorted(frames, key=lambda x: (x[0], x[1])):
+        rels = [r for r in o.get("visible_design_relations") or [] if isinstance(r, dict) and entity_id in (r.get("entity_ids") or [entity_id])]
+        dims = {d for r in rels for d in r.get("dimensions") or []}
+        text = " ".join(str(r.get("relation", "")).lower() for r in rels)
+        contact = "CHARACTER_BODY_HAND_CONTACT" in dims or ("grip" in text or "contact" in text)
+        face = bool(dims & {"CHARACTER_FACE_ACTING", "DEPTH_VIEWPOINT"})
+        occl = any(w in text for w in ("occlud", "behind", "in front", "overlap"))
+        redraw = any(isinstance(c, dict) and c.get("kind") == "INFERRED_NEW_DRAWING" and entity_id in (c.get("entity_ids") or [entity_id])
+                     for c in o.get("changed_since_prior_frame") or [])
+        ids = tuple(sorted(str(x) for x in o.get("persistent_state_ids") or [] if str(x).startswith(entity_id)))
+        sig = (ids, contact, face, occl)
+        if last is None or sig != last or redraw:
+            inv.append({"state_id": f"{entity_id}#S{len(inv)}", "signature": {"drawing_state_ids": list(ids), "contact": contact, "face_view": face,
+                                                                             "occlusion": occl, "starts_with_redraw": redraw},
+                        "sequence_id": seq, "frames": [], "regions": [], "hard_case": contact or occl or redraw or face,
+                        "contact_substantive": _addressing(o.get("character_face_limb_contact_state")) == "SUBSTANTIVE"})
+            last = sig
+        inv[-1]["frames"].append(k)
+        inv[-1]["regions"].append(reg)
+    return inv
+
+
+def select_study_frames(inventory: list[dict], capacity: int, required: list[dict] | None = None) -> dict:
+    """Pick one representative frame per distinct state — hard cases first, then the rest, then chronology — within the image budget.
+    Anything not selected is NAMED (state id + exact frames). A required critical state (from the independent auditor) that no
+    selected state covers is a MISSING_CRITICAL_STATE with its frames."""
+    order = sorted(inventory, key=lambda s: (not s["hard_case"], s["frames"][0]))
+    chosen = order[: max(0, capacity)]
+    uncovered = [{"state_id": s["state_id"], "frames": s["frames"][:10], "signature": s["signature"]} for s in order[max(0, capacity):]]
+    picks = []
+    for s in sorted(chosen, key=lambda s: s["frames"][0]):
+        mid = s["frames"][len(s["frames"]) // 2]
+        picks.append({"state_id": s["state_id"], "frame": mid, "region": s["regions"][s["frames"].index(mid)], "hard_case": s["hard_case"],
+                      "sequence_id": s["sequence_id"]})
+    covered = {f for s in chosen for f in s["frames"]}
+    missing = [{"phenomenon_id": r.get("phenomenon_id"), "kind": r["kind"], "frames": r["frames"]} for r in required or []
+               if not any(a in covered for a in range(int(r["frames"][0]), int(r["frames"][1]) + 1))]
+    return {"picks": picks, "uncovered_states": uncovered, "missing_critical_states": missing}
+
+
+def dossier_state_problems(dossier: dict, state_witness: dict[str, str]) -> list[str]:
+    """Every state shown to the study must be cited by it (a dossier that ignores an examined state is not a study of it)."""
+    cited = {w for part in (_fields(dossier) or {}).values() if isinstance(part, dict) for w in part.get("witness_ids") or []}
+    cited |= {w for x in (dossier.get("identity_across_drawings") or []) if isinstance(x, dict) for w in x.get("witness_ids") or []}
+    return [f"MISSING_STATE_IN_DOSSIER:{sid}" for sid, wid in sorted(state_witness.items()) if wid not in cited]
+
+
 def _fields(dossier: dict) -> dict:
     return (dossier.get("study") or {}).get("fields") or dossier.get("fields") or {}
 
@@ -186,6 +240,9 @@ def production_coverage_ledger(plan: dict, decisions: list[dict], skill: dict | 
                      "status": "OWNED" if br else "UNOWNED", "reviewer_verdict": "UNREVIEWED"})
     return {"ledger": "ProductionDecisionCoverage", "scope_id": scope_id, "rows": rows,
             "complete": all(r["status"] == "OWNED" for r in rows),
+            # R3-C10: ownership is not implementation — no row is visually verified until a VisualQualification exists for it
+            "ownership_complete": all(r["status"] == "OWNED" for r in rows), "implementation_verified": False,
+            "implementation_status": "OWNED_UNVERIFIED (needs region-aligned ablation on real output + human visual approval)",
             "note": "cannot claim source study; an image clause never counts as a motion rule"}
 
 

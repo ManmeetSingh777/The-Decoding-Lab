@@ -46,13 +46,19 @@ def _author(st, q, ans, **kw):
     return author_decision(st, q, ans, authorized_submission_manifest=_man(st, sent), **kw)
 
 
-def _witness(st, wid, film, k, dims, rel, cls="biped", kind="FULL_FRAME", region=None, dossier=True):
+SIBLINGS: set = set()     # R3-C10: a whole-illustration rule needs >=2 witnessed relations — each full-frame witness has a real sibling
+
+
+def _witness(st, wid, film, k, dims, rel, cls="biped", kind="FULL_FRAME", region=None, dossier=True, sibling=True):
     if dossier:
         _dossier(st, film)
-    st.put("Witness", wid, {"witness_id": wid, "film_sha256": film, "sequence_id": f"seq-{film[:4]}", "frame_start": k, "frame_end": k,
-                            "evidence_kind": kind, "observer": "VLM", "visible_relation": rel, "image_sha256": f"{k:064x}",
-                            "region": region, "subject_class": cls, "scene_specific_facts": [], "observation_ids": [f"{film[:16]}:{k}"],
-                            "limits": "SYNTHETIC test witness", "dimensions": dims, "evidence_origin": "SIMULATED_VLM_TRANSPORT"})
+    for w_, k_ in ((wid, k),) + (((wid + "+", k + 1),) if sibling and kind == "FULL_FRAME" else ()):
+        st.put("Witness", w_, {"witness_id": w_, "film_sha256": film, "sequence_id": f"seq-{film[:4]}", "frame_start": k_, "frame_end": k_,
+                               "evidence_kind": kind, "observer": "VLM", "visible_relation": rel, "image_sha256": f"{k_:064x}",
+                               "region": region, "subject_class": cls, "scene_specific_facts": [], "observation_ids": [f"{film[:16]}:{k_}"],
+                               "limits": "SYNTHETIC test witness", "dimensions": dims, "evidence_origin": "SIMULATED_VLM_TRANSPORT"})
+    if sibling and kind == "FULL_FRAME":
+        SIBLINGS.add(wid + "+")
 
 
 def _answer(wids, action, *, op="op.canonical_character", when=None, ref=True):
@@ -60,7 +66,7 @@ def _answer(wids, action, *, op="op.canonical_character", when=None, ref=True):
            {"mode": "NOT_APPLICABLE", "reason": "SYNTHETIC: carried by the relation clause"})
     return {"answer_status": "INFERRED",
             "SOURCE_VISIBLE_FACTS": [{"relation": f"SYNTHETIC: in {w} the near contour overlaps the far brow while the light stays fixed",
-                                      "witness_ids": [w]} for w in wids],
+                                      "witness_ids": [w]} for w in list(wids) + [x + "+" for x in wids if x + "+" in SIBLINGS]],
             "CONSTRUCTION_EXPLANATION": "SYNTHETIC: the head contour and the eye occlusion are redrawn together as the view turns",
             "WHY_THE_DECISION_MATTERS": "SYNTHETIC: keeps identity readable across the turn", "WHEN_NOT_APPLICABLE": ["diagram frames"],
             "ADAPTS_WITH": ["anatomy"], "CREATIVE_FREEDOM": ["identity"], "FORBIDDEN_SOURCE_SPECIFIC": ["source character"],
@@ -184,7 +190,7 @@ def test_reanswering_same_choice_keeps_contradiction_instead_of_overwriting(stor
     assert d["version"] == 2 and d["status"] == "RESEARCH_ONLY"
     assert d["research_only_reason"] == "OPEN_CONTRADICTION_NEEDS_DISCRIMINATING_EVIDENCE"
     c = d["contradictions"][0]
-    assert c["earlier_witness_ids"] == ["W-A"] and c["later_witness_ids"] == ["W-C"]
+    assert c["earlier_witness_ids"] == ["W-A", "W-A+"] and c["later_witness_ids"] == ["W-C", "W-C+"]
     assert "tucked" in c["earlier_action"] and "fully visible" in c["later_action"]
 
 
@@ -266,7 +272,8 @@ class _StubVision:
 def test_missing_source_gap_triggers_crop_and_neighbour_reinspection_not_a_stop(ws, monkeypatch):
     from vme.loop.real import RealLoopRunner, RealProviders
     st = ws.store()
-    _witness(st, "W-x", FA, 10, ["WORLD_ASSEMBLY"], "SYNTHETIC: background layers recede behind the focal form", region={"x": 8, "y": 4, "w": 32, "h": 16})
+    _witness(st, "W-x", FA, 10, ["WORLD_ASSEMBLY"], "SYNTHETIC: background layers recede behind the focal form", region={"x": 8, "y": 4, "w": 32, "h": 16},
+             sibling=False)
     prov = RealProviders(vision_client_factory=lambda: None, vision_transport_kind="SIMULATED", image_transport=None, image_transport_kind="SIMULATED")
     r = RealLoopRunner(ws, run_id="REAL-T", providers=prov)
     frames = _StubFrames(FA)

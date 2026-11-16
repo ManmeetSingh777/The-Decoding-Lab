@@ -24,17 +24,24 @@ def _png(rgb=(10, 20, 30), size=(64, 36)) -> bytes:
     return b.getvalue()
 
 
+SIBLINGS: set = set()     # R3-C10: whole-illustration rules need >=2 witnessed relations — each full-frame witness gets a real sibling
+
+
 def _w(st, wid, film, k, dims, rel="SYNTHETIC: the near contour overlaps the far edge while the background stays behind", kind="FULL_FRAME",
-       region=None, observer="VLM", parent=None, cls="biped"):
-    st.put("Witness", wid, {"witness_id": wid, "film_sha256": film, "sequence_id": f"seq-{film[:4]}", "frame_start": k, "frame_end": k,
-                            "evidence_kind": kind, "observer": observer, "visible_relation": rel, "image_sha256": f"{k:064x}",
-                            "region": region, "subject_class": cls, "scene_specific_facts": [], "observation_ids": [f"{film[:16]}:{k}"],
-                            "limits": "SYNTHETIC", "dimensions": dims, "evidence_origin": "SIMULATED_VLM_TRANSPORT",
-                            "parent_full_frame_witness": parent})
+       region=None, observer="VLM", parent=None, cls="biped", sibling=True):
+    for w_, k_ in ((wid, k),) + (((wid + "+", k + 1),) if sibling and kind == "FULL_FRAME" else ()):
+        st.put("Witness", w_, {"witness_id": w_, "film_sha256": film, "sequence_id": f"seq-{film[:4]}", "frame_start": k_, "frame_end": k_,
+                               "evidence_kind": kind, "observer": observer, "visible_relation": rel, "image_sha256": f"{k_:064x}",
+                               "region": region, "subject_class": cls, "scene_specific_facts": [], "observation_ids": [f"{film[:16]}:{k_}"],
+                               "limits": "SYNTHETIC", "dimensions": dims, "evidence_origin": "SIMULATED_VLM_TRANSPORT",
+                               "parent_full_frame_witness": parent})
+    if sibling and kind == "FULL_FRAME":
+        SIBLINGS.add(wid + "+")
 
 
 def _man(st, ids, **override):
     ms = []
+    ids = list(ids) + [w + "+" for w in ids if w + "+" in SIBLINGS and st.get("Witness", w + "+") and w + "+" not in ids]
     for w in ids:
         r = st.get("Witness", w)
         m = {"witness_id": w, "source_sha256": r["film_sha256"], "frame_index": r["frame_start"], "region": r.get("region"),
@@ -48,7 +55,7 @@ def _ans(wids, action="SYNTHETIC: draw the {subject} with the near limb overlapp
          *, op="op.whole_scene", when=None, policy=None, extra=None):
     a = {"answer_status": "INFERRED", "REMAINING_UNKNOWN": ["SYNTHETIC: profile view"],
          "SOURCE_VISIBLE_FACTS": [{"relation": f"SYNTHETIC: in {w} the near hand overlaps the handle edge while the sleeve stays behind",
-                                   "witness_ids": [w]} for w in wids],
+                                   "witness_ids": [w]} for w in list(wids) + [x + "+" for x in wids if x + "+" in SIBLINGS]],
          "CONSTRUCTION_EXPLANATION": "SYNTHETIC: hand and prop are drawn as one contact state rather than a transformed arm",
          "WHY_THE_DECISION_MATTERS": "SYNTHETIC: contact reads", "WHEN_NOT_APPLICABLE": ["diagram frames"], "ADAPTS_WITH": ["anatomy"],
          "BRANCHES": [{"when": when or {"environment": "underwater"}, "operation_id": op, "construction_action": action,
@@ -155,7 +162,7 @@ def test_f05_disjoint_branches_do_not_own_a_joint_condition_unless_invariance_is
     req = [{"conditions": {"view": "profile", "action": "grip"}, "operation_ids": ["op.whole_scene"], "choice_id": "choice:test"}]
     a = _ans(["W-1"])
     a["BRANCHES"] = [dict(a["BRANCHES"][0], when={"view": "profile"}),
-                     dict(a["BRANCHES"][0], when={"action": "grip"}, construction_action="SYNTHETIC: draw the grip with the near hand over the edge")]
+                     dict(a["BRANCHES"][0], when={"action": "grip"}, construction_action="SYNTHETIC: draw the {subject} grip with the near hand over the {original_prop} edge while the far hand stays behind it")]
     d = _author(store, _q(contrast=["W-2"]), a, _man(store, ["W-1", "W-2"]), req=req, did="PC-J1")
     assert d["status"] == "RESEARCH_ONLY" and d["research_only_reason"].startswith("BRANCHES_MISSING_FOR")
     joint = _ans(["W-1"], when={"view": "profile", "action": "grip"})

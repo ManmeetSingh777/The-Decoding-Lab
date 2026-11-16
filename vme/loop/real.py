@@ -897,10 +897,14 @@ class RealLoopRunner:
             imgs = []
             send_ids = []
             for wid in (q.observed_contrast_with_witness_ids or refs):
-                par = (wits.get(wid) or {}).get("parent_full_frame_witness") if (wits.get(wid) or {}).get("evidence_kind") == "AUDIO_SIGNAL" else None
-                need = [wid] + ([par] if par and par not in send_ids and par in wits else [])
-                if par and par not in wits:
-                    continue                      # audio evidence without its frame context is never sent alone
+                wk = (wits.get(wid) or {}).get("evidence_kind")
+                par = (wits.get(wid) or {}).get("parent_full_frame_witness") if wk in ("AUDIO_SIGNAL", "NATIVE_CROP") else None
+                if wk in ("AUDIO_SIGNAL", "NATIVE_CROP") and (not par or par not in wits):
+                    continue                      # audio / crop evidence without its full-frame context is never sent alone
+                nbs = [n for n in (wits.get(wid) or {}).get("temporal_neighbor_witnesses") or [] if n in wits][:2] if wk == "NATIVE_CROP" else []
+                if wk == "NATIVE_CROP" and not nbs:
+                    continue                      # a crop needs temporal context too
+                need = [wid] + [x for x in [par] + nbs if x and x not in send_ids]
                 if len(send_ids) + len([x for x in need if x not in send_ids]) > 6:
                     break
                 send_ids += [x for x in need if x not in send_ids]
@@ -961,7 +965,7 @@ class RealLoopRunner:
             try:
                 eff = lc.apply_answer(p, q, ans, decision_writer=writer)
             except Blocked as b:
-                eff = {"status": "UNKNOWN", "decision_changed": False, "blocked": b.code}
+                eff = {"status": "UNKNOWN", "decision_changed": False, "blocked": b.code, "blocked_detail": str(b.detail)[:600]}
             if q.owner_stage == "STYLE_CONDITIONS" or eff.get("decision_changed"):
                 from ..style.authoring import register_relations_from_answer
                 if q.answer_status in ("OBSERVED", "INFERRED"):
@@ -1018,7 +1022,7 @@ class RealLoopRunner:
                         reg = next((r.get("region") for r in o.get("visible_design_relations") or [] if isinstance(r, dict) and r.get("region")), None)
                         for e in o.get("actually_visible_actor_and_object_ids") or []:
                             eid = e if isinstance(e, str) else str((e or {}).get("id"))
-                            out.setdefault((film, eid), []).append((seq, k, reg))
+                            out.setdefault((film, eid), []).append((seq, k, reg, o))
         finally:
             st.close()
         return out
@@ -1026,46 +1030,45 @@ class RealLoopRunner:
     def _character_study(self, st, vis) -> dict:
         """Addendum 29 C0–C10 per (film, drawn entity): whole frames from different states, a native crop, and an UNLIKE contrast entity
         from another film, through P2. Validated against the LOCAL submission manifest; invalid studies block character rules."""
-        from ..style.source_ledger import validate_character_art_study
+        from ..style.source_ledger import validate_character_art_study, character_state_inventory, select_study_frames, dossier_state_problems
         from ..vision.dispatch import submitted_manifest
+        from ..reference.frames import native_crop
         ents = self._entity_frames(self._intervals(st))
         invalid, made = [], 0
+        cls_of = lambda frs: sorted({str(x[3].get("subject_class")) for x in frs if x[3].get("subject_class")})
         for (film, eid), frames in sorted(ents.items()):
             did = "CD-" + digest([film, eid])[:16]
             prev = st.get("CharacterArtDossier", did)
             if prev and prev.get("status") == "VALIDATED":
                 continue
-            seqs: set = set()
-            picks: list = []
-            for seq, k, reg in sorted(frames, key=lambda x: (x[0], x[1])):
-                if seq not in seqs or len(picks) < 2:
-                    if (seq, k) not in [(x[0], x[1]) for x in picks]:
-                        picks.append((seq, k, reg))
-                        seqs.add(seq)
-                if len(picks) >= 3:
-                    break
-            contrast = next(((f2, fr2[0]) for (f2, e2), fr2 in sorted(ents.items()) if f2 != film), None)
+            # R3-C09: choose by DISTINCT OBSERVED STATE and hard cases, never "the first three"; the auditor's critical states are required
+            inv = character_state_inventory(eid, frames)
+            required = [e for au in st.list("PhenomenonAudit") if au.get("film_sha256") == film for e in au.get("expected") or []
+                        if e["kind"] in ("ALTERNATE_STATE", "HAND_CONTACT") and eid in (e.get("entity_ids") or [])]
+            # every distinct state is studied: several P2 passes when they do not fit one request (each pass: its states, the native
+            # crops of its hard cases, the same contrast); the dossier is VALIDATED only if every pass is valid and cites every state
+            sel = select_study_frames(inv, len(inv), required)
+            picks = [(p["sequence_id"], p["frame"], p["region"], p) for p in sel["picks"]]
+            mine = set(cls_of(frames))
+            others = [(f2, e2, fr2) for (f2, e2), fr2 in sorted(ents.items()) if f2 != film]
+            unlike = [x for x in others if set(cls_of(x[2])) - mine]                # semantically relevant: an UNLIKE subject class
+            contrast_pick = (unlike or others or [None])[0]
+            contrast = (contrast_pick[0], contrast_pick[2][0]) if contrast_pick else None
+            contrast_relevance = "UNLIKE_SUBJECT_CLASS" if unlike else ("SAME_CLASS_OTHER_FILM" if others else None)
             _, idx, cache = self._film(film)
-            imgs = []
-            for seq, k, reg in picks:
-                fr = cache.frame(k)
-                imgs.append(self._img("TARGET", film, fr, wid=f"W-{film[:10]}-{k}-0" if st.get("Witness", f"W-{film[:10]}-{k}-0") else None,
-                                      label=f"STATE {eid} frame={film[:16]}:{k} seq={seq}"))
-            if picks:
-                seq, k, reg = picks[0]
-                fr = cache.frame(k)
-                r = reg or {"x": fr.width // 4, "y": fr.height // 4, "w": fr.width // 2, "h": fr.height // 2}
-                r = {kk: int(r[kk]) for kk in ("x", "y", "w", "h")}
-                from ..reference.frames import native_crop
-                cr = native_crop(fr, r["x"], r["y"], r["w"], r["h"])
-                imgs.append(self._img("NATIVE_CROP", film, fr, wid=f"{film[:16]}:{k}:crop:{r['x']},{r['y']},{r['w']},{r['h']}", png=cr.png_bytes,
-                                      region=r, w=cr.output_width, h=cr.output_height, label=f"NATIVE_CROP {eid} frame={film[:16]}:{k}"))
-            if contrast:
-                f2, (seq2, k2, _r2) = contrast
-                _, idx2, cache2 = self._film(f2)
-                fr2 = cache2.frame(k2)
-                imgs.append(self._img("CONTRAST", f2, fr2, wid=f"W-{f2[:10]}-{k2}-0" if st.get("Witness", f"W-{f2[:10]}-{k2}-0") else None,
-                                      label=f"CONTRAST other-entity frame={f2[:16]}:{k2}"))
+            per_pass = max(1, vis.caps.max_images_per_request - 3)                     # room for 2 hard-case crops + the contrast
+            batches = [picks[i:i + per_pass] for i in range(0, len(picks), per_pass)] or [[]]
+            if len(batches) > 1 and len(batches[-1]) < 2:          # every pass proves identity across >=2 drawings: chain the last one
+                batches[-1] = [batches[-2][-1]] + batches[-1]
+            if sel["missing_critical_states"]:
+                rec = {"dossier_id": did, "entity_id": eid, "films": [film], "status": "INCOMPLETE_STATE_COVERAGE", "state_inventory": inv,
+                       "problems": [f"MISSING_CRITICAL_STATE:{m['kind']}@{m['frames']}" for m in sel["missing_critical_states"]],
+                       "next": {"missing_critical_states": sel["missing_critical_states"],
+                                "action": "the auditor saw a contact/redraw the observer never recorded for this entity: reinspect exactly "
+                                          "these frames (inspect_range by PTS) before any character rule"}, "at": now_iso()}
+                st.put("CharacterArtDossier", did, rec)
+                invalid.append(rec)
+                continue
             if len(picks) < 2 or not contrast:
                 rec = {"dossier_id": did, "entity_id": eid, "films": [film], "status": "INSUFFICIENT_SOURCE_DIVERSITY",
                        "problems": ["UNRESOLVED_BY_CURRENT_WITNESSES: need >=2 drawn states and an unlike contrast entity"],
@@ -1073,17 +1076,47 @@ class RealLoopRunner:
                 st.put("CharacterArtDossier", did, rec)
                 invalid.append(rec)
                 continue
-            tid = custom_id_for("character_dossier", {"film": film, "entity": eid, "images": [i["image_bytes_sha256"] for i in imgs],
-                                                      "model": vis.caps.model_id, "system_sha": digest(CHARACTER_DOSSIER_SYSTEM)})
-            resp, _prep = self._src_request(vis, tid, "character_dossier", "P2", CHARACTER_DOSSIER_SHAPE, imgs, {"entity_id": eid},
-                                            selection={"film_sha256": film, "entity_id": eid, "frames": [x[1] for x in picks]})
-            made += 1
-            allowed = set(submitted_manifest(vis, tid)["submitted_witness_ids"])
-            problems = validate_character_art_study(resp if isinstance(resp, dict) else {}, allowed)
-            rec = {"dossier_id": did, "entity_id": eid, "films": sorted({i["source_sha256"] for i in imgs}), "task": tid,
-                   "witness_ids": sorted(allowed), "study": {k: (resp or {}).get(k) for k in ("study_basis", "fields", "identity_across_drawings",
-                                                                                           "contrasting_examples", "scope_class")},
-                   "status": "VALIDATED" if not problems else "INVALID", "problems": problems,
+            f2, (seq2, k2, _r2, _o2) = contrast
+            _, idx2, cache2 = self._film(f2)
+            fr2 = cache2.frame(k2)
+            contrast_img = self._img("CONTRAST", f2, fr2, wid=f"W-{f2[:10]}-{k2}-0" if st.get("Witness", f"W-{f2[:10]}-{k2}-0") else None,
+                                     label=f"CONTRAST other-entity frame={f2[:16]}:{k2}")
+            problems, passes, all_allowed, state_wid, resp = [], [], set(), {}, None
+            for bi, batch in enumerate(batches):
+                imgs, bw = [], {}
+                for seq, k, reg, p in batch:
+                    fr = cache.frame(k)
+                    wid = f"W-{film[:10]}-{k}-0" if st.get("Witness", f"W-{film[:10]}-{k}-0") else None
+                    imgs.append(self._img("TARGET", film, fr, wid=wid, label=f"STATE {eid} {p['state_id']} frame={film[:16]}:{k} seq={seq}"))
+                    bw[p["state_id"]] = imgs[-1]["witness_id"]
+                for seq, k, reg, p in [x for x in batch if x[3]["hard_case"]][:2]:          # native crops of this pass's hard cases
+                    fr = cache.frame(k)
+                    r = reg or {"x": fr.width // 4, "y": fr.height // 4, "w": fr.width // 2, "h": fr.height // 2}
+                    r = {kk: int(r[kk]) for kk in ("x", "y", "w", "h")}
+                    cr = native_crop(fr, r["x"], r["y"], r["w"], r["h"])
+                    imgs.append(self._img("NATIVE_CROP", film, fr, wid=f"{film[:16]}:{k}:crop:{r['x']},{r['y']},{r['w']},{r['h']}", png=cr.png_bytes,
+                                          region=r, w=cr.output_width, h=cr.output_height, label=f"NATIVE_CROP {eid} {p['state_id']} frame={film[:16]}:{k}"))
+                imgs.append(contrast_img)
+                tid = custom_id_for("character_dossier", {"film": film, "entity": eid, "pass": bi, "images": [i["image_bytes_sha256"] for i in imgs],
+                                                          "model": vis.caps.model_id, "system_sha": digest(CHARACTER_DOSSIER_SYSTEM)})
+                r_, _prep = self._src_request(vis, tid, "character_dossier", "P2", CHARACTER_DOSSIER_SHAPE, imgs,
+                                              {"entity_id": eid, "pass": bi, "of_passes": len(batches)},
+                                              selection={"film_sha256": film, "entity_id": eid, "frames": [x[1] for x in batch]})
+                made += 1
+                allowed = set(submitted_manifest(vis, tid)["submitted_witness_ids"])
+                all_allowed |= allowed
+                pr_ = validate_character_art_study(r_ if isinstance(r_, dict) else {}, allowed)
+                pr_ += dossier_state_problems(r_ if isinstance(r_, dict) else {}, bw)
+                problems += [f"pass{bi}:{x}" for x in pr_]
+                passes.append({"task": tid, "states": sorted(bw), "problems": pr_})
+                state_wid.update(bw)
+                resp = resp or r_
+            tid = passes[0]["task"]
+            rec = {"dossier_id": did, "entity_id": eid, "films": [film], "task": tid, "passes": passes,
+                   "witness_ids": sorted(all_allowed), "study": {k: (resp or {}).get(k) for k in ("study_basis", "fields", "identity_across_drawings",
+                                                                                               "contrasting_examples", "scope_class")},
+                   "status": "VALIDATED" if not problems else "INVALID", "problems": problems, "state_inventory": inv,
+                   "studied_states": sorted(state_wid), "contrast_relevance": contrast_relevance,
                    "source_art_truth": "UNREVIEWED (needs human native-detail review)", "evidence_origin": self.p.evidence_origin, "at": now_iso()}
             rec["films"] = [film]
             st.put("CharacterArtDossier", did, rec)
@@ -1198,16 +1231,25 @@ class RealLoopRunner:
                 films.add(w["film_sha256"])
             if len(refs) >= 3:
                 break
-        for r_ in list(refs):              # an AUDIO_SIGNAL witness is only evidence together with its full-frame parent
+        for r_ in list(refs):              # AUDIO_SIGNAL and NATIVE_CROP witnesses are evidence ONLY together with their full-frame parent
             w_ = st.get("Witness", r_)
-            if w_ and w_.get("evidence_kind") == "AUDIO_SIGNAL":
+            if w_ and w_.get("evidence_kind") in ("AUDIO_SIGNAL", "NATIVE_CROP"):
                 par = w_.get("parent_full_frame_witness")
                 if not par or not st.get("Witness", par):
                     refs.remove(r_)
-                elif par not in refs:
+                    continue
+                if par not in refs:
                     refs.append(par)
-        contrast = [w["witness_id"] for w in ws if w["witness_id"] not in refs and w["film_sha256"] not in films][:2] or \
-                   [w["witness_id"] for w in ws if w["witness_id"] not in refs and w.get("subject_class") not in
+                if w_["evidence_kind"] == "NATIVE_CROP":      # and a crop keeps its temporal context (existing neighbour witnesses)
+                    for nb in [n for n in (w_.get("temporal_neighbor_witnesses") or []) if st.get("Witness", n)][:2]:
+                        if nb not in refs:
+                            refs.append(nb)
+                    if not any(st.get("Witness", n) for n in (w_.get("temporal_neighbor_witnesses") or [])):
+                        refs.remove(r_)                         # no temporal context exists: the crop alone is not admissible
+        # contrast witnesses are whole frames (a crop / audio onset is never a stand-alone contrast)
+        whole = [w for w in ws if w["evidence_kind"] == "FULL_FRAME" and w["witness_id"] not in refs]
+        contrast = [w["witness_id"] for w in whole if w["film_sha256"] not in films][:2] or \
+                   [w["witness_id"] for w in whole if w.get("subject_class") not in
                     {x.get("subject_class") for x in ws if x["witness_id"] in refs}][:2]
         return refs, contrast
 
@@ -1714,6 +1756,10 @@ class RealLoopRunner:
                                                "scope_note": "one unseen still never certifies character/world/acting/animation transfer (R23)"})
         from ..review.qualification import capability_verdict
         st.put("CapabilityVerdict", self.run_id, capability_verdict(st, self.run_id))     # R3 F17: separate statuses, never averaged
+        from ..review.qualification import HELDOUT_AV_REQUIREMENTS
+        st.put("HeldoutAVQualification", self.run_id, {"run_id": self.run_id, "status": "NOT_ATTEMPTED",
+                                                        "requirements": list(HELDOUT_AV_REQUIREMENTS), "met": [],
+                                                        "note": "a still transfer only transfers still claims (R3-C11)"})
         return "COMPLETED", {"transfer": "STILL_TRANSFER_PENDING_AWAITING_REVIEW", "animated_transfer": "NOT_ATTEMPTED",
                              "audiovisual_qualification": "NOT_QUALIFIED (still-only holdout never grants motion/AV)",
                              "holdout": sealed[0], "output_sha": r["n_whole_scene"]["sha"],

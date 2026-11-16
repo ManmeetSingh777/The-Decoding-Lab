@@ -190,14 +190,14 @@ def _dossier(user, imgs) -> dict:
               "fills_edges_materials": f("adjacent fill regions meet at a value step with no drawn outline between them, so the edge stays soft against the setting", "edge by value step", crop[:1] or states[:1]),
               "lighting_and_shadows": f("one darker region follows the lower contour on the side away from the brighter setting area",
                                         "shadow region follows the contour", states[:2]),
-              "view_and_pose_redraws": f("between the two states the contour is redrawn, not rotated", "needs a redrawn state asset", states[:2]),
+              "view_and_pose_redraws": f("between the shown states the contour is redrawn, not rotated", "needs a redrawn state asset", states),
               "contact_and_occlusion": f("the near part overlaps the setting edge while the far part stays behind", "near/far layer order", states[:1]),
               "world_integration": f("the entity's value range sits inside the setting's range with higher local contrast", "value-relative integration",
                                      states[:1] + con[:1])}
     if user.get("entity_id") == "sim_unknown_pose":
         fields["view_and_pose_redraws"] = {"state": "UNKNOWN", "witness_ids": states[:1], "precise_next_witness": "a profile state of this entity"}
     return {"study_basis": "SOURCE_FIRST_DRAWN_ENTITY", "entity_id": user.get("entity_id"), "fields": fields,
-            "identity_across_drawings": [{"witness_ids": states[:2], "what_persists": "SIMULATED: mass grouping and value roles",
+            "identity_across_drawings": [{"witness_ids": states, "what_persists": "SIMULATED: mass grouping and value roles",
                                           "what_is_redrawn": "SIMULATED: outer contour"}],
             "contrasting_examples": [{"witness_ids": con[:1], "difference": "SIMULATED: the contrast entity uses a different mass grouping"}],
             "scope_class": "CONDITIONAL_STYLE_RULE"}

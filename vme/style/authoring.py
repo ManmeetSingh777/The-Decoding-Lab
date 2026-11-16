@@ -149,9 +149,10 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
     wrecs = [w for w in wrecs if w]
     # an AUDIO_SIGNAL witness is evidence only with the full frame it coincides with: attach that parent as context, but ONLY when the
     # local submission manifest shows it was actually sent in this request (never pulled in from the store unseen)
+    # The same holds for a NATIVE_CROP and its full-frame parent (R3-C07/C08: crops reach the bundle only with their context).
     have = {w["witness_id"] for w in wrecs}
     for w in list(wrecs):
-        par = w.get("parent_full_frame_witness") if w.get("evidence_kind") == "AUDIO_SIGNAL" else None
+        par = w.get("parent_full_frame_witness") if w.get("evidence_kind") in ("AUDIO_SIGNAL", "NATIVE_CROP") else None
         if par and par not in have and par in authorized:
             pw = store.get("Witness", par)
             if pw:
@@ -159,7 +160,7 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
                 have.add(par)
                 contrast.append(par)
         elif par and par not in have and w["witness_id"] not in cited:
-            wrecs.remove(w)                       # uncited audio contrast whose frame context was not sent: excluded, not imported
+            wrecs.remove(w)                       # uncited contrast whose frame context was not sent: excluded, not imported
             contrast.remove(w["witness_id"])
     if not wrecs:
         raise Blocked("NO_EVIDENCE_FOR_DECISION", question["question_id"])
