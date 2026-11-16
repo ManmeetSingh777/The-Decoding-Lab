@@ -53,9 +53,12 @@ nouns, operation_id}], INVARIANT str, ADAPTS_WITH [str], CREATIVE_FREEDOM [str],
 One BRANCH is required for each entry of required_branches (same conditions, one of its operation_ids).
 Every BRANCH also states reference_policy: {"mode": "REQUIRED"|"TEXT_ONLY_DEMONSTRATED"|"NOT_APPLICABLE", "roles": [{"role": "positive_view"|
 "contrast"|..., "witness_id": <one of the labelled witnesses>}], "reason": str} — omitting it leaves requiredness UNKNOWN (blocks).
-Motion/camera/attention/world/audio branches also give MOTION_PROGRAM {"track_kind": "ACTOR_ACTING"|"CAMERA"|"ATTENTION"|"WORLD"|"AUDIO",
-"method": "EASE_IN_OUT"|"HOLD_THEN_MOVE"|"ANTICIPATE_OVERSHOOT"|"STEPPED_REDRAW"|"CUE_ON_EVENT", "hold_ratio": 0..1,
-"anticipation_ratio": 0..1, "overshoot_ratio": 0..1, "witness_ids": [..]} derived from what the frames show; UNKNOWN otherwise."""
+Motion/camera/attention/world/audio branches also give MOTION_PROGRAM {"track_kind", "method", <every parameter of that method>,
+"witness_ids": [..]} derived from what the frames show, with these exact contracts (a missing parameter leaves the decision UNKNOWN):
+ACTOR_ACTING: EASE_IN_OUT | HOLD_THEN_MOVE{hold_ratio} | ANTICIPATE_OVERSHOOT{hold_ratio, anticipation_ratio, anticipation_span,
+overshoot_ratio, overshoot_span} (all 0..1); CAMERA: EASE_IN_OUT | HOLD_THEN_MOVE{hold_ratio}; ATTENTION: DIM_OTHERS | LOCAL_HIGHLIGHT |
+LOCAL_SCALE {transition_frames, hold_frames, release_frames, magnitude}; WORLD: PARALLAX_LAYERS{layer_coefficients: {depth: camera
+coefficient}}; AUDIO: CUE_ON_EVENT{cue_offset_frames}. UNKNOWN otherwise."""
 NATIVE_SHAPE = """SOURCE ANALYSIS ONLY. Image 1 is a full frame, image 2 a NATIVE-resolution crop of it (no resampling), images 3-4
 the neighbouring frames. Describe only what the crop shows in relation to the whole frame and the neighbours. Return strict JSON:
 {"relations": [{"relation": str, "dimensions": [str]}], "changes_vs_neighbours": str, "uncertainty": [str]}."""
@@ -71,6 +74,8 @@ Mark UNKNOWN with the exact next witness whenever the pixels do not show it; nev
 RATIONALE_SYSTEM = pass_instructions("P2") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + RATIONALE_SHAPE
 QA_SYSTEM = pass_instructions("P4") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + QA_SHAPE
 NATIVE_SYSTEM = pass_instructions("P5") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + NATIVE_SHAPE
+from ..investigation.auditor import ADVERSARIAL_SHAPE as _ADV_SHAPE  # noqa: E402
+ADVERSARIAL_SYSTEM = pass_instructions("P5") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + _ADV_SHAPE
 CHARACTER_DOSSIER_SYSTEM = pass_instructions("P2") + "\n\nPASS-SPECIFIC OUTPUT SHAPE:\n" + CHARACTER_DOSSIER_SHAPE
 
 
@@ -414,6 +419,11 @@ class RealLoopRunner:
             pr = PacketRunner(st, self.ws.vision_dir, idx, cache, vis, source_is_synthetic=False,
                               active_questions=[{"question_id": f"QC-{seq}", "text": "Which visible relations make this window's art and "
                                                  "motion work, and what must a producer decide for a NEW subject?"}])
+            # R3-C06/C08: the LOCAL audio study runs first; EVERY onset (mapped to a frame by native PTS) is put in the packet manifest
+            arec = self._audio_signal(st, film, seq, a, b, idx)
+            for k in arec.get("onset_frame_indices", []):
+                pr.audio_events[(film, k)] = [{"kind": "AUDIO_ONSET", "source": "LOCAL_SIGNAL_ANALYSIS", "frame": k,
+                                               "pts_time": idx[k]["pts_time"]}]
             pr.register(plans)
             res = pr.resume(plans)
             res = self._split_truncated(st, pr, plans, res, idx, film, pass_id, seq, vis)
@@ -429,12 +439,16 @@ class RealLoopRunner:
                 obs += [json.loads(l) for l in fp.read_text(encoding="utf-8").splitlines() if l.strip()]
             st.put("CrossFrameEventGraph", f"{self.run_id}:{seq}", build_event_graph(obs))
             wit += self._extract_witnesses(st, film, seq, obs, idx)
-            audio_studies.append(self._study_audio(st, film, seq, a, b, idx, obs))
+            audio_studies.append(self._study_audio(st, film, seq, a, b, idx, obs, arec))
             self._register_phenomena(st, film, seq, obs)
             nf = self._native_followups(st, vis, film, seq, obs, idx, cache, src)
             native += nf["done"]
             if nf["pending"]:
                 pending_native.extend(nf["pending"])
+            au = self._audit_sequence(st, vis, film, seq, a, b, obs, idx, cache, arec)     # R3-C08 independent auditor + C07 reinspection
+            native += au["reinspected"]
+            if au["pending"]:
+                pending_native.extend(au["pending"])
         if pending:
             codes = {s for p in pending for s in p["packets"].values()}
             reason = "BLOCKED_AUTHORIZATION" if "BLOCKED_CONSENT" in codes else "PROVIDER_PENDING_OR_REINSPECTION"
@@ -485,22 +499,35 @@ class RealLoopRunner:
                     results[x.packet_id] = pr.run(x)
         return {**res, "results": results}
 
-    def _study_audio(self, st, film, seq, a, b, idx, obs) -> dict:
-        """R3 F14: local decode of the selected interval's audio; onsets that coincide with a recorded visible change become
-        AUDIO_SIGNAL witnesses. No meaning is inferred from energy; nothing is uploaded or copied."""
+    def _audio_signal(self, st, film, seq, a, b, idx) -> dict:
+        """R3 F14/C06: local decode of the selected interval's audio. The envelope uses the interval's OWN median frame duration, and
+        every onset TIME is mapped to the frame whose native PTS is nearest (variable-frame-rate safe). Nothing is uploaded."""
         from ..reference.audio import study_interval
         lock = self._lock()
         s = next(x for x in lock["sources"] if x["sha256"] == film)
-        fps = 1.0 / max(1e-6, (idx[-1]["pts_time"] - idx[0]["pts_time"]) / max(1, len(idx) - 1))
-        rec = study_interval(Path(lock["folder"]) / s["relative_path"], start_pts=idx[a]["pts_time"], end_pts=idx[b]["pts_time"], fps=fps,
+        d = sorted(idx[k + 1]["pts_time"] - idx[k]["pts_time"] for k in range(a, b) if k + 1 < len(idx)) or [1 / 30.0]
+        fps = 1.0 / max(1e-6, d[len(d) // 2])
+        t0 = idx[a]["pts_time"]
+        rec = study_interval(Path(lock["folder"]) / s["relative_path"], start_pts=t0, end_pts=idx[b]["pts_time"], fps=fps,
                              film_sha256=film, sequence_id=seq)
-        st.put("SourceAudioStudy", f"{self.run_id}:{seq}", rec)   # (re-put below if onsets stay unlinked)
+        frames = []
+        for t in rec.get("onset_times_s", []):
+            k = min(range(a, b + 1), key=lambda i: (abs(idx[i]["pts_time"] - (t0 + t)), i))
+            frames.append(k)
+        rec["onset_frame_indices"] = sorted(set(frames))
+        rec["frame_mapping"] = "NEAREST_NATIVE_PTS"
+        st.put("SourceAudioStudy", f"{self.run_id}:{seq}", rec)
+        return rec
+
+    def _study_audio(self, st, film, seq, a, b, idx, obs, rec: dict | None = None) -> dict:
+        """R3 F14: onsets that coincide with a committed full frame become AUDIO_SIGNAL witnesses — ALL of them (R3-C06), each bound
+        to its aligned full-frame parent. No meaning is inferred from energy; nothing is uploaded or copied."""
+        rec = rec if rec is not None else self._audio_signal(st, film, seq, a, b, idx)
         changed = {int(str(o["frame_id"]).split(":")[1]) for o in obs if o.get("changed_since_prior_frame")}
         full = {w["frame_start"]: w["witness_id"] for w in st.list("Witness")
                 if w["film_sha256"] == film and w.get("sequence_id") == seq and w.get("evidence_kind") == "FULL_FRAME"}
-        for j, of in enumerate(rec.get("onset_frames", [])[:5]):
-            k = a + of
-            if k > b:
+        for j, k in enumerate(rec.get("onset_frame_indices", [])):
+            if not a <= k <= b:
                 continue
             near = sorted((x for x in full if abs(x - k) <= 1), key=lambda x: (abs(x - k), x))
             if not near:            # no committed full-frame witness at this time: the onset stays unlinked, never fabricated
@@ -592,6 +619,67 @@ class RealLoopRunner:
                 st.put("NativeFollowupBudget", self.run_id, {"used": self._native_budget_used(st) + 1, "budget": self.cfg.native_followup_budget})
                 done += 1
         return {"done": done, "pending": pending}
+
+    def _audit_sequence(self, st, vis, film, seq, a, b, obs, idx, cache, arec) -> dict:
+        """R3-C08 independent auditor + R3-C07 mandatory targeted reinspection. Expected phenomena come from local detectors and a P5
+        adversarial sweep that is NOT shown the P1 observations; each one the observations do not explain is reinspected natively
+        (full native frame + neighbours) whether or not the observer asked; what reinspection cannot explain stays a NAMED gap."""
+        from ..investigation.auditor import (ADVERSARIAL_SHAPE, adversarial_expectations, local_expectations, reinspection_resolves)
+        from ..vision.contracts import audit_phenomenon_coverage
+        from ..reference.frames import native_crop
+        expected = local_expectations(film=film, seq=seq, a=a, b=b, survey=st.get("FilmSurvey", film),
+                                      audio_onsets=arec.get("onset_frame_indices", []))
+        step = max(1, (b - a) // max(1, vis.caps.max_images_per_request - 2))
+        ks = sorted({a, b, *range(a, b + 1, step)})[: vis.caps.max_images_per_request]
+        frs = [cache.frame(k) for k in ks]
+        imgs = [self._img("TARGET", film, fr, label=f"FULL {film[:16]}:{fr.presentation_index}") for fr in frs]
+        tid = custom_id_for("adversarial_sweep", {"source_sha": film, "interval": [a, b], "frames": [fr.png_sha256 for fr in frs],
+                                                  "model": vis.caps.model_id, "system_sha": digest(ADVERSARIAL_SYSTEM)})
+        resp, _p = self._src_request(vis, tid, "adversarial_sweep", "P5", ADVERSARIAL_SHAPE, imgs,
+                                     {"interval": [a, b], "frames": ks, "prior_observations_withheld": True},
+                                     selection={"film_sha256": film, "sequence_id": seq, "interval": [a, b]})
+        adv, rejected = adversarial_expectations(resp, film=film, seq=seq, a=a, b=b)
+        expected += adv
+        gaps = audit_phenomenon_coverage(obs, expected)
+        resolved, open_, pending, done = [], [], [], 0
+        for g in gaps:
+            k = (int(g["interval"][0]) + int(g["interval"][1])) // 2
+            if self._native_budget_used(st) >= self.cfg.native_followup_budget:
+                pending.append({"film": film, "frame": k, "region": None, "reason": g["gap"], "sequence": seq, "phenomenon_id": g["phenomenon_id"]})
+                open_.append(g)
+                continue
+            full = cache.frame(k)
+            r = {"x": 0, "y": 0, "w": full.width, "h": full.height}
+            crop = native_crop(full, 0, 0, full.width, full.height)
+            nb = [cache.frame(j) for j in (max(0, k - 1), min(len(idx) - 1, k + 1)) if j != k]
+            wid = f"W-{film[:10]}-{k}-reinspect-{digest(g['phenomenon_id'])[:8]}"
+            ims = [self._img("TARGET", film, full, label=f"FULL {film[:16]}:{k}"),
+                   self._img("NATIVE_CROP", film, full, wid=f"{film[:16]}:{k}:crop:0,0,{full.width},{full.height}", png=crop.png_bytes, region=r,
+                             w=crop.output_width, h=crop.output_height, label=f"NATIVE_CROP {film[:16]}:{k} x=0 y=0 w={full.width} h={full.height}")]
+            ims += [self._img("NEIGHBOUR", film, x, label=f"NEIGHBOUR {film[:16]}:{x.presentation_index}") for x in nb]
+            tid2 = custom_id_for("native_detail", {"source_sha": film, "frame": k, "gap": g["phenomenon_id"], "crop_sha": crop.crop_png_sha256,
+                                                   "model": vis.caps.model_id, "system_sha": digest(NATIVE_SYSTEM)})
+            resp2, _p2 = self._src_request(vis, tid2, "native_detail", "P5", NATIVE_SHAPE, ims,
+                                           {"reason": f"MANDATORY reinspection: {g['gap']}", "frame": k,
+                                            "gap": {"phenomenon_id": g["phenomenon_id"], "kind": g["kind"], "interval": g["interval"]}},
+                                           selection={"film_sha256": film, "sequence_id": seq, "frame": k})
+            st.put("NativeFollowupBudget", self.run_id, {"used": self._native_budget_used(st) + 1, "budget": self.cfg.native_followup_budget})
+            done += 1
+            ok = reinspection_resolves(g["kind"], resp2)
+            for i, rel in enumerate(ok):
+                st.put("Witness", f"{wid}-{i}", {"witness_id": f"{wid}-{i}", "film_sha256": film, "sequence_id": seq, "frame_start": k, "frame_end": k,
+                                                 "evidence_kind": "NATIVE_CROP", "observer": "VLM", "visible_relation": rel["relation"],
+                                                 "image_sha256": crop.crop_png_sha256, "region": r, "parent_full_frame_witness": f"W-{film[:10]}-{k}-0",
+                                                 "temporal_neighbor_witnesses": [f"W-{film[:10]}-{x.presentation_index}-0" for x in nb],
+                                                 "subject_class": None, "scene_specific_facts": [], "observation_ids": [f"{film[:16]}:{k}"],
+                                                 "limits": f"mandatory reinspection for {g['phenomenon_id']}", "dimensions": rel.get("dimensions") or [],
+                                                 "pts_time": idx[k]["pts_time"], "evidence_origin": self.p.evidence_origin})
+            (resolved if ok else open_).append({**g, "reinspection_task": tid2, "witnesses": [f"{wid}-{i}" for i in range(len(ok))]})
+        audit = {"run_id": self.run_id, "sequence_id": seq, "film_sha256": film, "interval": [a, b], "expected": expected,
+                 "sources": sorted({e["source"] for e in expected}), "adversarial_rejected": rejected, "resolved_by_reinspection": resolved,
+                 "gaps": [{**g, "gap": g["gap"]} for g in open_], "observer_was_not_the_auditor": True}
+        st.put("PhenomenonAudit", f"{self.run_id}:{seq}", audit)
+        return {"reinspected": done, "pending": pending, "open": len(open_)}
 
     def _register_phenomena(self, st, film, seq, obs) -> None:
         """A28 pass 1/6: salient visual behaviour the vision model could not place in the atlas becomes a VisualPhenomenon
@@ -1512,9 +1600,19 @@ class RealLoopRunner:
             problems.append("shot_plan.actors missing: every actor's placement/size/depth/keyframes must be directed (no default x=55%)")
         if problems:
             return "STOPPED", {"stop_reason": "SHOT_PLAN_NOT_DIRECTED", "problems": problems}
-        scale = W / float(sp.get("plan_width", W))
+        # R3-C02/C04: no local scaling here — ONE ShotCoordinateSpace inside compile_event_program maps every coordinate; world
+        # layers are the shot plan's declared depth layers, each bound to an approved world asset (a single plate is one layer).
         assets = {"world_plate.png": pack["world_plate"]["path"]}
-        layers = [{"id": "world", "src": "world_plate.png", "x": 0, "y": 0, "w": W, "h": H, "z": 0}]
+        wls = sp.get("world_layers") or [{"id": "world", "depth": None}]
+        layers = []
+        for i, wl in enumerate(wls):
+            if wl["id"] != "world" and wl["id"] not in (pack.get("world_layers") or {}):
+                return "STOPPED", {"stop_reason": "WORLD_LAYER_ASSET_MISSING", "layer": wl["id"],
+                                   "note": "a depth layer needs its own approved world asset; one plate is never sliced by guesswork"}
+            src = "world_plate.png" if wl["id"] == "world" else f"world_{wl['id']}.png"
+            if wl["id"] != "world":
+                assets[src] = pack["world_layers"][wl["id"]]["path"]
+            layers.append({"id": wl["id"], "src": src, "x": 0, "y": 0, "w": W, "h": H, "z": -len(wls) + i})
         event_trace = []
         cba = pack.get("canonical_by_actor") or {}
         for a in sp["actors"]:
@@ -1524,8 +1622,8 @@ class RealLoopRunner:
                                    "note": "each actor needs its own approved canonical; actors never alias another actor's art"}
             name = f"{a['id']}_canonical.png"
             assets[name] = canon["path"]
-            lay = {"id": a["id"], "src": name, "x": int(a["x"] * scale), "y": int(a["y"] * scale), "w": int(a["w"] * scale),
-                   "h": int(a["h"] * scale), "z": int(a["z"]), "keyframes": [], "states": [], "identity_sha256": canon["sha256"]}
+            lay = {"id": a["id"], "src": name, "x": 0, "y": 0, "w": 0, "h": 0,       # geometry set ONLY by apply_program (coords)
+                   "z": int(a["z"]), "keyframes": [], "states": [], "identity_sha256": canon["sha256"]}
             for ev in [e for e in sp.get("events", []) if e.get("actor", a["id"]) == a["id"] and e.get("state")]:
                 stt = pack["states"].get(f"{a['id']}:{ev['state']}")
                 if stt is None:
@@ -1542,7 +1640,7 @@ class RealLoopRunner:
         s4 = self._out(st, "S4")
         scope = OriginalScope(scope_id=brief["brief_id"], **brief["scope"])
         skill_decs = json.loads((Path(s4["skill_folder"]) / "decisions.json").read_text(encoding="utf-8"))
-        prog = compile_event_program(decisions=skill_decs, scope=scope, brief=brief, pack=pack, width=W, height=H, scale=scale)
+        prog = compile_event_program(decisions=skill_decs, scope=scope, brief=brief, pack=pack, width=W, height=H)
         st.put("EventProgram", self.run_id, prog)
         scene = apply_program({"width": W, "height": H, "fps": fps, "durationInFrames": n, "background": "#000000",
                                "layers": sorted(layers, key=lambda l: l["z"])}, prog)
@@ -1585,7 +1683,7 @@ class RealLoopRunner:
             raise Blocked("SOUND_ASSET_BYTES_CHANGED", path)
         if not AuthorityRegistry(st).sound_asset(sha):
             raise Blocked("NO_APPROVED_SOUND_ASSET", f"{sha[:12]} has no human SOUND_ASSET_APPROVAL")
-        cues = [c["frame"] for c in prog["audio_cues"]]
+        cues = sorted({c["frame"] for c in prog["audio_cues"]})     # coinciding semantic cues share one measurable onset
         wav = build_cue_track(path, cues, fps=fps, frames=frames, out_wav=self.dir / "audio_program.wav")
         out = mux(video, wav, self.dir / "integrated.mp4")
         v = verify_av(out, cue_frames=cues, fps=fps, frames=frames)

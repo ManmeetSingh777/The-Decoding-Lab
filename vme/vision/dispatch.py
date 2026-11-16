@@ -20,7 +20,7 @@ from ..util import Blocked, canonical_json, digest, sha256_bytes, read_json
 from .protocol import PROTOCOL_SHA, PROTOCOL_VERSION, bind, pass_instructions
 
 PASS_FOR_KIND = {"frame_packet": "P1", "window_rationale": "P2", "character_dossier": "P2", "question_answer": "P4",
-                 "native_detail": "P5", "reinspection": "P5", "cold_start": "P6"}
+                 "native_detail": "P5", "reinspection": "P5", "adversarial_sweep": "P5", "cold_start": "P6"}
 IMAGE_ROLES = ("TARGET", "CONTEXT", "NATIVE_CROP", "NEIGHBOUR", "CONTRAST", "WITNESS")
 EVIDENCE_STATUSES = ("LOCAL_BYTES_VERIFIED", "SUBMITTED", "RESPONSE_RECEIVED", "IDENTITY_BOUND", "ARTISTIC_CLAIM_UNVERIFIED",
                      "SOURCE_ARTISTICALLY_REVIEWED")

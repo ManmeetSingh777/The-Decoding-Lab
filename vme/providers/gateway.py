@@ -48,6 +48,50 @@ class StyleImageGateway:
         if not issued_by_compiler(job):
             raise Blocked("RAW_PROMPT_GATEWAY_BYPASS", "gateway accepts only issued CompiledImageJob objects")
         fresh = recompile(job)
+        if fresh.trace.get("stage_plan") and int(job.trace.get("stage_index", 1)) == 1:
+            return self._submit_staged(job, fresh, task_category=task_category, probe=probe)
+        return self._submit_one(job, fresh, task_category=task_category, probe=probe)
+
+    # -- R3-C01: staged multi-reference execution -------------------------------------------------
+    def _stages_to_run(self, plan: list[dict]) -> list[dict]:
+        return list(plan)
+
+    def _submit_staged(self, job: CompiledImageJob, fresh: CompiledImageJob, *, task_category: str, probe: bool) -> dict:
+        """Execute EVERY stage of a staged job as its own compiled request (own journal row, uuid4, reservation, receipt).
+        Stage k binds the exact bytes stage k-1 returned. Coverage is checked against an INDEPENDENT recompilation, so a stage
+        that silently disappears is REQUIRED_STAGE_NOT_EXECUTED, and stage 1's image is never returned as the finished asset."""
+        from ..compiler.compiler import StyleProgramCompiler
+        plan = fresh.trace["stage_plan"]
+        required = list(fresh.trace["required_reference_shas"])
+        r = self._submit_one(job, fresh, task_category=task_category, probe=probe)
+        receipts = [{"stage": 1, "job_id": job.job_id, "task_uuid": r["task_uuid"], "request_body_sha256": r["request_body_sha256"],
+                     "reference_shas": list(job.trace["stage_ref_shas"]), "output_sha256": r["outputs"][0]["sha256"]}]
+        covered = list(job.trace["stage_ref_shas"])
+        i = job.inputs
+        for sp in self._stages_to_run(plan)[1:]:
+            maybe_crash(f"gateway_before_stage_{sp['index']}")
+            prior = r["outputs"][0]
+            sj = StyleProgramCompiler().compile(i["brief"], i["skill_folder"], pinned_skill_hash=i["pinned_skill_hash"], recipe_id=i["recipe_id"],
+                                                node_id=i["node_id"], caps=i["caps"], identity_assets=i["identity_assets"],
+                                                output_contract=i["output_contract"], actor_scope=i.get("actor_scope"),
+                                                stage={"index": sp["index"], "prior_output": {"sha256": prior["sha256"], "path": prior["path"]}})
+            if sj.trace["stage_prior_output_sha"] != prior["sha256"]:
+                raise Blocked("STAGE_NOT_BOUND_TO_PRIOR_OUTPUT", str(sp["index"]))
+            r = self._submit_one(sj, recompile(sj), task_category=task_category, probe=probe)
+            receipts.append({"stage": sp["index"], "job_id": sj.job_id, "task_uuid": r["task_uuid"], "request_body_sha256": r["request_body_sha256"],
+                             "prior_output_sha256": prior["sha256"], "reference_shas": list(sj.trace["stage_ref_shas"]),
+                             "output_sha256": r["outputs"][0]["sha256"]})
+            covered += [s for s in sj.trace["stage_ref_shas"] if s not in covered]
+        if len(receipts) != len(plan) or sorted(set(covered)) != sorted(set(required)):
+            raise Blocked("REQUIRED_STAGE_NOT_EXECUTED", f"executed {len(receipts)}/{len(plan)} stages; references never submitted: "
+                                                         f"{sorted(set(required) - set(covered))[:4]}")
+        final = {**r, "job_id": job.job_id, "staged": True, "stage_count": len(plan), "stage_receipts": receipts,
+                 "final_stage_job_id": receipts[-1]["job_id"], "reference_shas": required, "intermediate": False}
+        atomic_write_json(self.art / "provider" / job.job_id / "staged_result.json", final)
+        self.store.put("StagedImageResult", job.job_id, final)
+        return final
+
+    def _submit_one(self, job: CompiledImageJob, fresh: CompiledImageJob, *, task_category: str, probe: bool) -> dict:
         if fresh.logical_sha256 != job.logical_sha256 or fresh.logical_payload != job.logical_payload:
             raise Blocked("COMPILED_JOB_MUTATED", "payload differs from deterministic recompilation",
                           diff=payload_diff(fresh.logical_payload, job.logical_payload))
@@ -58,7 +102,7 @@ class StyleImageGateway:
         self._reservation = None
         row = self._row(job.logical_sha256)
         if row and row[0] == "COMMITTED":        # exact saved bytes + receipt; no request, no new reservation
-            return read_json(self.art / "provider" / job.job_id / "result.json")
+            return dict(read_json(self.art / "provider" / job.job_id / "result.json"))
         if self.adapter.kind == "REAL":
             if job.synthetic:
                 raise Blocked("SYNTHETIC_SKILL_TO_REAL_PROVIDER", "fixture skills never reach a paid provider")
@@ -219,6 +263,8 @@ class StyleImageGateway:
                   "adapter_kind": self.adapter.kind, "synthetic_skill": job.synthetic, "baseline_only": job.baseline_only,
                   "skill_hash": job.trace.get("skill_hash"), "selected_decisions": job.trace.get("selected_decisions"),
                   "clause_ids": job.trace.get("clause_ids"), "reference_shas": [r[1] for r in job.reference_images],
+                  "stage_index": int(job.trace.get("stage_index", 1)), "stage_count": len(job.trace.get("stage_plan") or [1]),
+                  "intermediate": int(job.trace.get("stage_index", 1)) < len(job.trace.get("stage_plan") or [1]),
                   "outputs": outs, "cost_usd": cost, "cost_status": "REPORTED" if cost is not None else "UNKNOWN",
                   "reservation_id": (self._reservation or {}).get("reservation_id"),
                   "label": ("OFFLINE_FIXTURE_NOT_LEARNED_ART" if self.adapter.kind != "REAL" else

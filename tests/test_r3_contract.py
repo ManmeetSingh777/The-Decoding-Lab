@@ -471,24 +471,27 @@ def _motion_fixture(method="ANTICIPATE_OVERSHOOT", drop=None):
     from vme.style.coverage import OriginalScope
     scope = OriginalScope(scope_id="S", subjects=[{"id": "hero", "kind": "character", "subject_kind": "biped", "actions": ["walk"]}],
                           world={"kind": "space", "layers": True}, camera={"moves": True}, audio_cues=[{"event_id": "e1"}])
+    from vme.render.motion_program import TRACK_METHOD_PARAMS
+    vals = {"hold_ratio": 0.2, "anticipation_ratio": 0.1, "anticipation_span": 0.2, "overshoot_ratio": 0.1, "overshoot_span": 0.15,
+            "cue_offset_frames": 0, "layer_coefficients": {"far": 0.4}}
     mk = lambda did, owns, op, kind, when, m: {"decision_id": did, "status": "EXECUTABLE_CANDIDATE", "owned_choice_ids": [owns],
                                                "dimension_tags": [], "branches": [{"when": when, "operation_node_ids": [op],
                                                                                    "motion_program": {"track_kind": kind, "method": m,
-                                                                                                      "hold_ratio": 0.2, "anticipation_ratio": 0.1,
-                                                                                                      "overshoot_ratio": 0.1}}]}
+                                                                                                      **{p: vals[p] for p in TRACK_METHOD_PARAMS[kind][m]}}}]}
     from vme.style.coverage import reverse_plan
     plan = reverse_plan(scope)
     cond = {c["choice_id"]: c["conditions"] for c in plan["choices"]}
     dims = {c["choice_id"]: c["dimensions"] for c in plan["choices"]}
     decs = [mk("PC-act", "hero:acting", "op.motion_actor_track", "ACTOR_ACTING", cond["hero:acting"], method),
             mk("PC-cam", "camera:depth", "op.camera_attention", "CAMERA", cond["camera:depth"], "EASE_IN_OUT"),
-            mk("PC-wld", "world:motion", "op.world_motion", "WORLD", cond["world:motion"], "EASE_IN_OUT"),
+            mk("PC-wld", "world:motion", "op.world_motion", "WORLD", cond["world:motion"], "PARALLAX_LAYERS"),
             mk("PC-aud", "audio_timing", "op.audio_cue", "AUDIO", cond["audio_timing"], "CUE_ON_EVENT")]
     for d in decs:
         d["dimension_tags"] = dims[d["owned_choice_ids"][0]]
     decs = [d for d in decs if d["decision_id"] != drop]
-    brief = {"shot_plan": {"frames": 60, "actors": [{"id": "hero", "x": 0, "y": 0, "w": 10, "h": 10, "z": 1,
-                                                     "keyframes": [{"frame": 0, "x": 0}, {"frame": 59, "x": 100}]}],
+    brief = {"shot_plan": {"frames": 60, "plan_width": 100, "plan_height": 100, "world_layers": [{"id": "world", "depth": "far"}],
+                           "actors": [{"id": "hero", "x": 0, "y": 0, "w": 10, "h": 10, "z": 1,
+                                                     "keyframes": [{"frame": 0, "x": 0}, {"frame": 59, "x": 80}]}],
                            "camera": [{"frame": 0, "x": 0, "y": 0, "scale": 1}, {"frame": 59, "x": 20, "y": 0, "scale": 1}],
                            "events": [{"event_id": "e1", "actor": "hero", "from": 20, "to": 30}], "audio": {"required": True, "cues": []}}}
     return decs, scope, brief
@@ -502,7 +505,7 @@ def test_f13_motion_is_owned_by_source_decisions_and_ablation_changes_or_blocks_
     owners = {t["kind"]: t["owner_decision_id"] for t in p["tracks"]}
     assert owners == {"ACTOR_ACTING": "PC-act", "CAMERA": "PC-cam", "WORLD": "PC-wld", "AUDIO": "PC-aud"}
     kf = {k["frame"]: k for k in next(t for t in p["tracks"] if t["kind"] == "ACTOR_ACTING")["keyframes"]}
-    assert min(v["x"] for v in kf.values()) < 0 and max(v["x"] for v in kf.values()) > 100        # learned anticipation + overshoot
+    assert min(v["x"] for v in kf.values()) < 0 and max(v["x"] for v in kf.values()) > 80         # learned anticipation + overshoot
     d2, s2, b2 = _motion_fixture(method="HOLD_THEN_MOVE")
     p2 = compile_event_program(decisions=d2, scope=s2, brief=b2, pack={"states": {}}, width=100, height=100, scale=1.0)
     kf2 = next(t for t in p2["tracks"] if t["kind"] == "ACTOR_ACTING")["keyframes"]
@@ -608,6 +611,7 @@ def test_f14_av_gate_fails_on_missing_static_or_off_sync_audio(tmp_path):
 def test_f14_audio_decision_needs_a_local_source_audio_witness_and_sound_needs_approval(store, ws, tmp_path):
     _w(store, "W-1", FA, 3, ["VISUAL_AUDIO_TIMING"])
     a = _ans(["W-1"], op="op.audio_cue", action="SYNTHETIC: place the cue at the frame where the near form overlaps the edge")
+    a["BRANCHES"][0]["MOTION_PROGRAM"] = {"track_kind": "AUDIO", "method": "CUE_ON_EVENT", "cue_offset_frames": 0, "witness_ids": ["W-1"]}
     d = _author(store, _q(), a, _man(store, ["W-1"]), dims=("VISUAL_AUDIO_TIMING",), did="PC-AU")
     assert d["status"] == "RESEARCH_ONLY" and d["research_only_reason"].startswith("AUDIO_UNSTUDIED")
     from vme.loop.real import RealLoopRunner, RealProviders

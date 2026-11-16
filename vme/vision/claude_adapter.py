@@ -29,7 +29,7 @@ DEFAULT_MODEL = "claude-opus-5-5"
 # Pricing as listed in the claude-api skill model table (cached 2026-11-03): $4 / $20 per MTok for claude-opus-5-5.
 # Recorded as UNVERIFIED until the user confirms; batch discount is NOT assumed.
 PRICE_TABLE_UNVERIFIED: dict[str, dict[str, Any]] = {"claude-opus-5-5": {"input_per_mtok": 4.0, "output_per_mtok": 20.0, "source": "claude-api skill table cached 2026-11-03"}}
-REQUEST_KINDS = ("frame_packet", "window_rationale", "question_answer", "native_detail", "character_dossier")
+REQUEST_KINDS = ("frame_packet", "window_rationale", "question_answer", "native_detail", "character_dossier", "adversarial_sweep")
 
 
 def image_tokens_estimate(w: int, h: int) -> int:

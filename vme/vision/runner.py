@@ -101,6 +101,8 @@ class PacketRunner:
         self.provider = provider
         self.synthetic = source_is_synthetic
         self.questions = active_questions or []
+        # R3-C08: locally detected audio events per (film, frame index); a target frame carrying one must be linked by the observer
+        self.audio_events: dict[tuple, list] = {}
         if provider.kind == "MOCK" and not source_is_synthetic:
             raise Blocked("MOCK_PROVIDER_ON_REAL_SOURCE_FORBIDDEN",
                           "mock observations must never enter real film coverage")
@@ -151,6 +153,9 @@ class PacketRunner:
                     "presentation_index": k, "pts": rec["pts"], "pts_time": rec["pts_time"], "image_sha": fr["png_sha"],
                     "width": fr["w"], "height": fr["h"], "scale_factor": fr.get("scale", 1.0),
                     "is_target": k in p.target_indices, "raw_identity_sha": rec["frame_content_sha256"]}
+            ae = self.audio_events.get((p.film_sha256, k))
+            if ae and item["is_target"]:
+                item["audio_events"] = ae
             (tgt if item["is_target"] else ctx).append(item)
             (imgs_t if item["is_target"] else imgs_c).append(fr["png"])
         return tgt, ctx, imgs_t + imgs_c
@@ -306,6 +311,18 @@ class PacketRunner:
                           "observation_sha,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                           (p.film_sha256, m["presentation_index"], p.pass_id, status, p.packet_id, m["image_sha"],
                            digest(o), now_iso()))
+            # R3-C08: the ARTISTIC inspection verdict is stored per frame, separate from identity binding; an INSPECTION_INSUFFICIENT
+            # frame is committed as identity-bound evidence only and keeps its scene open for targeted reinspection
+            insp = v.get("inspection") or {"per_frame": {}, "packet_gaps": [{"gap": "INSPECTION_NOT_ASSESSED"}]}
+            for o, m in zip(sorted(v["observations"], key=lambda x: int(x["frame_id"].split(":")[1])), tgt):
+                pf = insp["per_frame"].get(o["frame_id"]) or {"status": "INSPECTION_INSUFFICIENT", "gaps": [{"gap": "INSPECTION_NOT_ASSESSED"}],
+                                                              "open_unknowns": []}
+                self.store.put("FrameInspection", f"{p.pass_id}:{o['frame_id']}",
+                               {"frame_id": o["frame_id"], "film_sha256": p.film_sha256, "frame_index": m["presentation_index"],
+                                "pass_id": p.pass_id, "packet_id": p.packet_id, "pts_time": m["pts_time"], "status": pf["status"],
+                                "gaps": pf["gaps"] + insp.get("packet_gaps", []), "open_unknowns": pf["open_unknowns"],
+                                "identity_status": "RESPONSE_IDENTITY_BOUND"}, conn=c)
+            checkpoint["inspection_adequate"] = bool(insp.get("adequate"))
             maybe_crash("mid_semantic_commit")
             self.store.put("SemanticPacketCheckpoint", p.packet_id, checkpoint, conn=c)
             self._set(p.packet_id, "SEMANTIC_COMMITTED", c, semantic_manifest_sha=frames_sha)

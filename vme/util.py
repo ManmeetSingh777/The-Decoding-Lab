@@ -181,6 +181,10 @@ RELATION_TERMS = (
     "changes", "overlap", "occlud", "silhouette", "separat", "contrast", "depends",
     "adapt", "when", "if ", "compared", "near", "far", "foreground", "background",
     "follows", "coordinat", "joins", "contact", "grip", "turns", "redraw", "replaced",
+    # spatial / persistence relations (R3-C08: precise statements like "thumb in front, fingers behind" are relational)
+    "in front", "behind", "above", "below", "inside", "around", "wraps", "matches", "same as", "unchanged", "persists",
+    # temporal relations (audiovisual and event timing)
+    "coincid", "lands on", "synchron", "before", "after", "during", "same frame",
 )
 
 

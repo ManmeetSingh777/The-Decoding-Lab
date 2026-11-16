@@ -119,6 +119,27 @@ def source_art_ledger(st, ws, run_id: str, intervals: list[tuple], pass_id: str)
         for x in phen:
             if x.get("status") != "EXPLAINED":
                 open_gaps.append({"kind": "UNEXPLAINED_PHENOMENON", "phenomenon_id": x["phenomenon_id"], "next": "P5 reinspection + P4 question"})
+        # R3-C08: a frame record is not an inspection. Every bound frame needs an ADEQUATE per-frame verdict; explicit unknowns and
+        # phenomena enumerated by the INDEPENDENT auditor but not explained keep the scene open at their exact frames.
+        insp = {r["frame_index"]: r for r in st.list("FrameInspection") if r.get("film_sha256") == film and r.get("pass_id") == pass_id
+                and a <= int(r["frame_index"]) <= b}
+        not_assessed = sorted(i for i in bound if i not in insp)
+        if not_assessed:
+            open_gaps.append({"kind": "INSPECTION_NOT_ASSESSED", "frames": not_assessed[:20], "next": "re-run the packet(s) under the inspection gate"})
+        weak = sorted((i, r) for i, r in insp.items() if r["status"] != "ARTISTIC_INSPECTION_ADEQUATE")
+        if weak:
+            open_gaps.append({"kind": "ARTISTIC_INSPECTION_INSUFFICIENT", "frames": [i for i, _ in weak][:20],
+                              "gaps": sorted({g["gap"] for _, r in weak for g in r["gaps"]}), "next": "targeted native reinspection of those frames"})
+        for i, r in sorted(insp.items()):
+            for u in r.get("open_unknowns") or []:
+                open_gaps.append({"kind": "KNOWN_UNKNOWN", "frame": i, "dimension": u["dimension"], "next": u.get("next_witness")})
+        audit = st.get("PhenomenonAudit", f"{run_id}:{seq}")
+        if audit is None:
+            open_gaps.append({"kind": "INDEPENDENT_AUDIT_NOT_RUN", "next": "run the auditor (local detectors + P5 adversarial sweep)"})
+        else:
+            for g in audit.get("gaps") or []:
+                open_gaps.append({"kind": g["gap"], "phenomenon_id": g.get("phenomenon_id"), "interval": g.get("interval"),
+                                  "source": g.get("source"), "next": g.get("next")})
         for e in sorted(entities):
             d = next((d for d in dos if d["entity_id"] == e), None)
             if d is None or d.get("status") != "VALIDATED":

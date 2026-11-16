@@ -185,6 +185,11 @@ def author_decision(store, question: dict, answer: dict, *, dims: list[str], reg
                  for r in pol.get("roles", [])]
         mandatory = [r["role_id"] for r in roles] if pol["mode"] == "REQUIRED" else []
         mp = b.get("MOTION_PROGRAM") if isinstance(b.get("MOTION_PROGRAM"), dict) else None
+        from ..render.motion_program import TRACK_OPS, validate_motion_program
+        if op in TRACK_OPS.values():      # R3-C04: a motion branch must carry EVERY parameter of its track/method contract
+            mprobs = validate_motion_program(mp)
+            if mprobs:
+                policy_problems.append({"when": when, "operation": op, "problem": "MOTION_PROGRAM_INCOMPLETE:" + ";".join(mprobs)})
         branches.append({"when": when, "construction_action": b.get("construction_action", ""), "clause_ids": [],
                          "reference_role_ids": [r["role_id"] for r in roles], "mandatory_reference_role_ids": mandatory,
                          "reference_policy": {**pol, "role_bindings": roles}, "motion_program": mp,

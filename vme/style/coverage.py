@@ -149,6 +149,8 @@ def reverse_plan(scope: OriginalScope) -> dict:
             need(f"{sid}:design", ["ORIGINAL_SUBJECT_DESIGN", "SHAPE_SURFACE_DETAIL"], f"{sid}:object", "whole_scene", conditions=cond)
             joints.append({"joint_id": f"{sid}:part_to_whole", "dimensions": ["ORIGINAL_SUBJECT_DESIGN", "MATERIAL_LIGHT_FINISH"],
                            "seed": "part_to_whole"})
+            if s.get("actions"):           # R3-C04: an independently moving world object needs its OWN source-owned timing
+                need(f"{sid}:acting", ["MOTION_ACTING"], f"{sid}:object", "motion_actor_track", conditions=cond)
     cam = scope.camera or {}
     if cam.get("moves"):
         need("camera:depth", ["DEPTH_VIEWPOINT"], "world_layers", "camera_attention", conditions=dict(envc))

@@ -201,7 +201,7 @@ def build_synthetic_skill(folder: str | Path, *, include_grip: bool = True, incl
     (folder / "references").mkdir(parents=True, exist_ok=True)
     refs = []
     for i, (role, col) in enumerate([("style_character", (180, 60, 60)), ("style_world", (40, 90, 160))] +
-                                    [(f"style_extra_{k}", (90, 90, 90)) for k in range(extra_refs)]):
+                                    [(f"style_extra_{k}", (90 + 25 * k, 120 - 10 * k, 60 + 30 * k)) for k in range(extra_refs)]):
         b = _ref_png(role, col)
         p = folder / "references" / f"{role}.png"
         p.write_bytes(b)
@@ -215,6 +215,12 @@ def build_synthetic_skill(folder: str | Path, *, include_grip: bool = True, incl
         templates.setdefault(c["operation_id"].split(".")[1], {"clauses": [], "negative_clauses": []})["clauses"].append(c)
     if extra_clause:
         templates.setdefault(extra_clause["operation_id"].split(".")[1], {"clauses": [], "negative_clauses": []})["clauses"].append(extra_clause)
+    if overflow_policy == "STAGED_EDIT":     # R3-C01: the world decision explicitly owns the staged application of its extra references
+        templates.setdefault("reference_staged_edit", {"clauses": [], "negative_clauses": []})["clauses"].append(
+            {"id": "K-SYN-WORLD-01", "decision_id": "D-SYN-WORLD", "priority": 30, "operation_id": "op.reference_staged_edit",
+             "template": f"{SYN} Keep the composition of the prior image; apply the referenced construction system to the near, mid and far "
+                         f"structures of the ${{setting}} only.", "allowed_content_slots": ["setting"], "reference_roles": [],
+             "origin_type": "CROSS_SOURCE_INFERRED"})
     # unique clause ids across files: suffix by op
     for name, t in templates.items():
         for c in t["clauses"]:
@@ -222,6 +228,11 @@ def build_synthetic_skill(folder: str | Path, *, include_grip: bool = True, incl
                 c["id"] = f"{c['id']}@{name}"
     decisions = synthetic_decisions(include_grip=include_grip, include_face=include_face, face_light_joint=face_light_joint,
                                     grip_light_joint=grip_light_joint)
+    if overflow_policy == "STAGED_EDIT":
+        for d in decisions:
+            if d["decision_id"] == "D-SYN-WORLD":
+                for br in d["branches"]:
+                    br["operation_node_ids"] = br["operation_node_ids"] + ["op.reference_staged_edit"]
     for ov in decision_overrides or []:   # S3 output decisions replace fixture defaults (real answer->decision->skill flow)
         ov = {k: v for k, v in ov.items() if k not in ("run_id", "created_at", "substitution_challenge")}
         if any(d["decision_id"] == ov["decision_id"] for d in decisions):

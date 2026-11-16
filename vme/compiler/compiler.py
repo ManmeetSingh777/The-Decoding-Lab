@@ -128,7 +128,9 @@ class StyleProgramCompiler:
 
     def compile(self, raw_brief: dict, skill_folder: str | Path, *, pinned_skill_hash: str, recipe_id: str, node_id: str,
                 caps: dict, identity_assets: dict | None = None, output_contract: dict | None = None,
-                actor_scope: dict | None = None) -> CompiledImageJob:
+                actor_scope: dict | None = None, stage: dict | None = None) -> CompiledImageJob:
+        """stage = {"index": k>1, "prior_output": {"sha256", "path"}} compiles LATER stage k of a staged multi-reference job,
+        bound to the exact bytes the previous stage returned (R3-C01). Without it, stage 1 is compiled."""
         brief = validate_brief(raw_brief)
         skill = load_skill(skill_folder)
         if skill["skill_hash"] != pinned_skill_hash:
@@ -281,16 +283,46 @@ class StyleProgramCompiler:
             if r.get("source_film_sha256"):
                 source_shas.append(r["source_film_sha256"])
         stages = [{"stage": 1, "operator": node["operator"], "reference_count": len(refs)}]
+        stage_plan: list[dict] = []
+        role_owner = {w[1]: w[3] for w in wanted}
         max_refs = int(caps.get("max_reference_images", 0))
         if len(refs) > max_refs:
-            if skill["reference_overflow_policy"] == "STAGED_EDIT" and "imageEdit" in caps.get("supported_capabilities", []):
-                stages = [{"stage": 1, "operator": node["operator"], "reference_count": max_refs, "refs": [r[1] for r in refs[:max_refs]]},
-                          {"stage": 2, "operator": "op.region_edit", "reference_count": len(refs) - max_refs + 1,
-                           "refs": ["<stage1_output>"] + [r[1] for r in refs[max_refs:]],
-                           "note": "remaining required references applied by a staged guided edit, never dropped"}]
-                refs_stage1 = refs[:max_refs]
-            else:
+            if skill["reference_overflow_policy"] != "STAGED_EDIT":
                 raise Blocked("PROVIDER_REF_LIMIT", f"{len(refs)} required references > provider max {max_refs}")
+            # R3-C01: an EXECUTABLE chain, decided here, before any stage is charged. Stage 1 carries up to the provider limit;
+            # every later stage carries the previous stage's returned image + up to (limit-1) remaining references.
+            lacking = provider_supports("op.reference_staged_edit", caps)
+            if lacking or max_refs < 2:
+                raise Blocked("PROVIDER_REF_LIMIT", f"{len(refs)} required references > provider max {max_refs} and the provider cannot "
+                                                    f"carry a staged reference edit ({lacking or 'limit < 2'})")
+            chunks = [refs[:max_refs]]
+            rest = refs[max_refs:]
+            while rest:
+                chunks.append(rest[:max_refs - 1])
+                rest = rest[max_refs - 1:]
+            for k, ch in enumerate(chunks, start=1):
+                owners, cids = [], []
+                if k > 1:
+                    for r in ch:
+                        did = role_owner.get(r[0])
+                        br = selected.get(did, {}).get("branch") if did else None
+                        if not br or "op.reference_staged_edit" not in br.get("operation_node_ids", []):
+                            raise research_ticket("STAGE_EDIT_NOT_OWNED", missing_decision=did, affected_state=node_id,
+                                                  question=f"which source-grounded decision authorises applying reference role {r[0]} as a "
+                                                           f"staged edit (op.reference_staged_edit)?", reason="STAGE_EDIT_NOT_OWNED")
+                        mine = [c for c in br.get("clause_ids", []) if clause_by_id.get(c, {}).get("operation_id") == "op.reference_staged_edit"]
+                        if not mine:
+                            raise research_ticket("STAGE_EDIT_CLAUSE_MISSING", missing_decision=did, affected_state=node_id,
+                                                  question=f"decision {did} has no skill clause for op.reference_staged_edit",
+                                                  reason="STAGE_EDIT_CLAUSE_MISSING")
+                        owners.append(did)
+                        cids += [c for c in mine if c not in cids]
+                stage_plan.append({"index": k, "operator": node["operator"] if k == 1 else "op.reference_staged_edit",
+                                   "roles": [r[0] for r in ch], "ref_shas": [r[1] for r in ch], "owner_decisions": sorted(set(owners)),
+                                   "clause_ids": cids, "binds_prior_output": k > 1})
+            stages = [{"stage": s["index"], "operator": s["operator"], "reference_count": len(s["ref_shas"]) + (1 if s["index"] > 1 else 0),
+                       "refs": (["<prior_stage_output>"] if s["index"] > 1 else []) + s["ref_shas"]} for s in stage_plan]
+            refs_stage1 = chunks[0]
         else:
             refs_stage1 = refs
         # negatives
@@ -378,6 +410,8 @@ class StyleProgramCompiler:
                  "selected_branches": {did: selected[did]["branch"]["when"] for did in sorted(selected)},
                  "clause_ids": [s["clause_id"] for s in segs if s["authority"] == "STYLE"], "segments": segs,
                  "reference_trace": ref_trace, "optional_references_omitted": omitted, "stages": stages, "negative_trace": neg_trace, "field_ownership": ownership,
+                 "stage_plan": stage_plan, "stage_index": 1, "stage_ref_shas": [r[1] for r in refs_stage1],
+                 "required_reference_shas": [r[1] for r in refs],
                  "interface_two_audit": audit, "scene_art_plan": plan, "scene_art_plan_sha": digest(plan),
                  "caps_snapshot_id": caps.get("snapshot_id"), "caps_sha": digest(caps), "conditions": conditions,
                  "requires_source_upload_consent_for": sorted(set(source_shas)),
@@ -389,15 +423,65 @@ class StyleProgramCompiler:
         inputs = {"brief": raw_brief, "skill_folder": str(skill_folder), "pinned_skill_hash": pinned_skill_hash,
                   "recipe_id": recipe_id, "node_id": node_id, "caps": caps,
                   "identity_assets": {k: {kk: vv for kk, vv in v.items()} for k, v in identity_assets.items()},
-                  "output_contract": output_contract, "actor_scope": actor_scope}
+                  "output_contract": output_contract, "actor_scope": actor_scope, "stage": None}
         logical = {"payload": payload, "refs": [(r[0], r[1]) for r in refs_stage1], "trace_core": {
             k: trace[k] for k in ("brief_hash", "skill_hash", "selected_decisions", "clause_ids", "node_id", "caps_sha")}}
         if actor_scope:
             logical["actor_scope"] = actor_scope         # only per-actor jobs carry it, so single-actor job ids are unchanged
+        if stage_plan:
+            logical["stage_plan"] = [{k: v for k, v in s.items()} for s in stage_plan]
         lsha = digest(logical)
         trace["style_authority_report"]["job_id"] = f"job_{lsha[:20]}"
+        if stage and int(stage.get("index", 1)) > 1:
+            return self._stage_job(stage, stage_plan, refs, segs, clause_by_id, brief, caps, oc, trace, inputs, skill, lsha)
         return CompiledImageJob(f"job_{lsha[:20]}", payload, tuple(refs_stage1), trace, inputs,
                                 bool(skill["synthetic"]), False, lsha, _ISSUER)
+
+    def _stage_job(self, stage: dict, stage_plan: list[dict], refs: list, segs: list, clause_by_id: dict, brief, caps: dict, oc: dict,
+                   base_trace: dict, base_inputs: dict, skill: dict, base_lsha: str) -> CompiledImageJob:
+        """Stage k>1: prior stage's RETURNED bytes + the remaining references of stage k; prompt = content slots + only the skill
+        clauses authorised for op.reference_staged_edit by the decisions owning those references. Deterministic per prior sha."""
+        k = int(stage["index"])
+        if not stage_plan or k > len(stage_plan):
+            raise Blocked("STAGE_NOT_IN_PLAN", f"stage {k} of {len(stage_plan)}")
+        sp = stage_plan[k - 1]
+        prior = stage.get("prior_output") or {}
+        pp = Path(str(prior.get("path", "")))
+        if not pp.exists() or sha256_file(pp) != prior.get("sha256"):
+            raise Blocked("STAGE_PRIOR_OUTPUT_MISSING_OR_CHANGED", f"stage {k} must bind the exact bytes stage {k - 1} returned")
+        by_sha = {r[1]: r for r in refs}
+        stage_refs = [("stage_prior_output", prior["sha256"], "data:image/png;base64," + base64.b64encode(pp.read_bytes()).decode())] + \
+                     [by_sha[s] for s in sp["ref_shas"]]
+        if len(stage_refs) > int(caps.get("max_reference_images", 0)):
+            raise Blocked("PROVIDER_REF_LIMIT", f"stage {k} carries {len(stage_refs)} images > provider max")
+        ssegs = [s for s in segs if s["authority"] == "CONTENT"]
+        for cid in sorted(sp["clause_ids"], key=lambda c: (clause_by_id[c].get("priority", 100), c)):
+            c = clause_by_id[cid]
+            ssegs.append({"authority": "STYLE", "clause_id": cid, "skill_decision_id": c["decision_id"], "skill_hash": skill["skill_hash"],
+                          "template_sha": digest(c["template"]), "text": self._render_clause(c["template"], brief.slots)})
+        prompt = "\n".join(s["text"] for s in ssegs)
+        if len(prompt) > caps["max_prompt_chars"]:
+            raise Blocked("PROMPT_LIMIT", f"stage {k}: {len(prompt)} > {caps['max_prompt_chars']} (never truncated)")
+        payload = {"taskType": "imageInference", "model": caps["model_air_id"], "positivePrompt": prompt, "width": oc["width"],
+                   "height": oc["height"], "numberResults": 1, "outputType": caps.get("output_type", "base64Data"),
+                   "outputFormat": oc["format"], "includeCost": True, "inputs": {"referenceImages": [r[2] for r in stage_refs]}}
+        ownership = {"includeCost": "TECHNICAL:cost_reporting", "taskType": "TECHNICAL:provider_adapter",
+                     "model": "TECHNICAL:user_confirmed_model_air_id", "positivePrompt": "SEGMENTS", "width": "TECHNICAL:output_contract",
+                     "height": "TECHNICAL:output_contract", "numberResults": "TECHNICAL:fixed", "outputType": "TECHNICAL:provider_caps",
+                     "outputFormat": "TECHNICAL:output_contract", "inputs": "STAGE_PRIOR_OUTPUT+SKILL_REFERENCE_ROLES"}
+        audit = interface_two_audit(payload, ownership, ssegs)
+        if not audit["ok"]:
+            raise Blocked("PROMPT_AUTHORITY_VIOLATION", str(audit["problems"][:3]))
+        trace = {**base_trace, "operator": "op.reference_staged_edit", "segments": ssegs,
+                 "clause_ids": [s["clause_id"] for s in ssegs if s["authority"] == "STYLE"], "field_ownership": ownership,
+                 "interface_two_audit": audit, "stage_index": k, "stage_ref_shas": sp["ref_shas"], "stage_prior_output_sha": prior["sha256"],
+                 "stage_owner_decisions": sp["owner_decisions"], "base_logical_sha256": base_lsha,
+                 "reference_trace": [{"role": "stage_prior_output", "sha256": prior["sha256"], "authority": "PRIOR_STAGE_RETURNED_BYTES"}] +
+                                    [t for t in base_trace["reference_trace"] if t["sha256"] in sp["ref_shas"]]}
+        inputs = {**base_inputs, "stage": {"index": k, "prior_output": {"sha256": prior["sha256"], "path": str(pp)}}}
+        lsha = digest({"base": base_lsha, "stage": k, "prior": prior["sha256"], "payload": payload,
+                       "refs": [(r[0], r[1]) for r in stage_refs]})
+        return CompiledImageJob(f"job_{lsha[:20]}", payload, tuple(stage_refs), trace, inputs, bool(skill["synthetic"]), False, lsha, _ISSUER)
 
     def compile_baseline(self, raw_brief: dict, *, caps: dict, output_contract: dict) -> CompiledImageJob:
         """BASELINE_ONLY: explicit unspecialised comparison path; never promotable as learned style (11, 15 §6)."""
@@ -425,7 +509,7 @@ def recompile(job: CompiledImageJob) -> CompiledImageJob:
         return c.compile_baseline(i["brief"], caps=i["caps"], output_contract=i["output_contract"])
     return c.compile(i["brief"], i["skill_folder"], pinned_skill_hash=i["pinned_skill_hash"], recipe_id=i["recipe_id"],
                      node_id=i["node_id"], caps=i["caps"], identity_assets=i["identity_assets"], output_contract=i["output_contract"],
-                     actor_scope=i.get("actor_scope"))
+                     actor_scope=i.get("actor_scope"), stage=i.get("stage"))
 
 
 def payload_diff(a: dict, b: dict) -> dict:

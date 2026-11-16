@@ -24,6 +24,10 @@ OPERATORS: dict[str, dict] = {
                            "outputs": ["CHARACTER_STATE"], "identity_reference_required": True},
     "op.region_edit": {"kind": "region_edit", "backend": "provider", "requires": ["imageEdit", "mask"],
                        "outputs": ["WHOLE_SCENE"], "identity_reference_required": False},
+    # R3-C01: a LATER stage of a multi-reference job. Input = the previous stage's returned image bytes + the remaining mandatory
+    # references (≤ provider limit incl. the prior image); prompt = skill clauses authorised for THIS operator only.
+    "op.reference_staged_edit": {"kind": "reference_staged_edit", "backend": "provider", "requires": ["imageEdit", "referenceImages"],
+                                 "outputs": ["WHOLE_SCENE"], "identity_reference_required": False, "stage_only": True},
     "op.layer_extract": {"kind": "layer_extract", "backend": "local", "requires": ["mask_source"],
                          "outputs": ["LAYER", "MASK"], "identity_reference_required": False},
     "op.clean_plate": {"kind": "clean_plate", "backend": "provider", "requires": ["imageEdit", "mask"],
@@ -45,7 +49,8 @@ OPERATORS: dict[str, dict] = {
                      "identity_reference_required": False, "consumer": "vme.reference.audio:build_cue_track"},
 }
 
-PROVIDER_OPERATION_KINDS = ("whole_scene", "world_plate", "canonical_character", "guided_pose_edit", "region_edit", "clean_plate")
+PROVIDER_OPERATION_KINDS = ("whole_scene", "world_plate", "canonical_character", "guided_pose_edit", "region_edit", "clean_plate",
+                            "reference_staged_edit")
 
 
 def get_operator(op_id: str) -> dict:

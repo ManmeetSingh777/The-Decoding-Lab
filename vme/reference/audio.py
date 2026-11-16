@@ -86,7 +86,11 @@ def study_interval(video: str | Path, *, start_pts: float, end_pts: float, fps: 
             s = None
     if s is not None and len(quiet) - s >= 3:
         spans.append([s, len(quiet) - 1])
-    return {**base, "status": "AUDIO_SIGNAL_STUDIED_LOCALLY", "stream": info, "onset_frames": onsets(env), "silence_spans": spans,
+    hop = max(1, int(round(SR / fps)))
+    ons = onsets(env)
+    return {**base, "status": "AUDIO_SIGNAL_STUDIED_LOCALLY", "stream": info, "onset_frames": ons,
+            # R3-C06: onset TIMES (seconds from start_pts, exact envelope-bin start) so callers map to frames by native PTS (VFR-safe)
+            "onset_times_s": [round(i * hop / SR, 6) for i in ons], "silence_spans": spans,
             "peak_dbfs": float(20 * np.log10(max(1e-9, float(np.max(np.abs(pcm)))))), "envelope_frames": int(env.size)}
 
 

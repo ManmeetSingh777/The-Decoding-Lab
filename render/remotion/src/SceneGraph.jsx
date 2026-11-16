@@ -28,12 +28,15 @@ const activeSrc = (layer, frame) => {
   return s ? s.src : layer.src;
 };
 
+// R3-C03: per-layer attention (brightness / local scale) executes the skill-selected mechanism on the TARGET layers only.
 const Layer = ({layer, frame}) => {
   const x = track(layer.keyframes, frame, 'x', layer.x);
   const y = track(layer.keyframes, frame, 'y', layer.y);
   const r = track(layer.keyframes, frame, 'rotation', 0);
   const s = track(layer.keyframes, frame, 'scale', 1);
   const o = track(layer.keyframes, frame, 'opacity', 1);
+  const ab = track(layer.attentionKeyframes, frame, 'brightness', 1);
+  const as = track(layer.attentionKeyframes, frame, 'scale', 1);
   const px = layer.pivot ? layer.pivot[0] : 0;
   const py = layer.pivot ? layer.pivot[1] : 0;
   return (
@@ -49,7 +52,9 @@ const Layer = ({layer, frame}) => {
         transform: `rotate(${r}deg) scale(${s})`,
       }}
     >
-      <Img src={staticFile(activeSrc(layer, frame))} style={{width: layer.w, height: layer.h}} />
+      <div style={{width: layer.w, height: layer.h, transformOrigin: '50% 50%', transform: `scale(${as})`, filter: `brightness(${ab})`}}>
+        <Img src={staticFile(activeSrc(layer, frame))} style={{width: layer.w, height: layer.h}} />
+      </div>
       {(layer.children || []).map((c) => (
         <Layer key={c.id} layer={c} frame={frame} />
       ))}
@@ -57,28 +62,37 @@ const Layer = ({layer, frame}) => {
   );
 };
 
+// R3-C02/C04: every value arrives in OUTPUT PIXELS (the Python ShotCoordinateSpace is the only transform). The camera moves each
+// root layer by its own skill-owned coefficient (world depth parallax); actors sit on the reference plane (coefficient 1).
 export const SceneGraphComposition = ({scene}) => {
   const frame = useCurrentFrame();
+  if (scene.units !== undefined && scene.units !== 'px') {
+    throw new Error(`scene units must be px (got ${scene.units}); the renderer never rescales`);
+  }
   const cx = track(scene.camera.keyframes, frame, 'x', 0);
   const cy = track(scene.camera.keyframes, frame, 'y', 0);
-  const att = track((scene.attention || {}).keyframes, frame, 'scale', 1); // skill-owned attention emphasis (R3 F13)
-  const cs = track(scene.camera.keyframes, frame, 'scale', 1) * att;
+  const cs = track(scene.camera.keyframes, frame, 'scale', 1);
   const roots = [...scene.layers].sort((a, b) => a.z - b.z);
   return (
     <AbsoluteFill style={{backgroundColor: scene.background || '#000000', overflow: 'hidden'}}>
-      <div
-        style={{
-          position: 'absolute',
-          width: scene.width,
-          height: scene.height,
-          transformOrigin: '0px 0px',
-          transform: `translate(${-cx}px, ${-cy}px) scale(${cs})`,
-        }}
-      >
-        {roots.map((l) => (
-          <Layer key={l.id} layer={l} frame={frame} />
-        ))}
-      </div>
+      {roots.map((l) => {
+        const k = l.cameraCoefficient === undefined ? 1 : l.cameraCoefficient;
+        const sk = 1 + (cs - 1) * k;
+        return (
+          <div
+            key={l.id}
+            style={{
+              position: 'absolute',
+              width: scene.width,
+              height: scene.height,
+              transformOrigin: '0px 0px',
+              transform: `translate(${-cx * k}px, ${-cy * k}px) scale(${sk})`,
+            }}
+          >
+            <Layer layer={l} frame={frame} />
+          </div>
+        );
+      })}
     </AbsoluteFill>
   );
 };

@@ -148,10 +148,13 @@ def _respond(params) -> dict:
         return _frame_packet(user, imgs)
     if kind == "window_rationale":
         return _rationale(user, imgs)
+    if kind == "adversarial_sweep":
+        return _adversarial(user, imgs)
     if kind == "native_detail":
         dims = [d for d in user.get("dimensions") or [] if isinstance(d, str)] or ["SHAPE_SURFACE_DETAIL"]
         if "gap" in user and user["gap"].get("phenomenon_id"):
-            dims = sorted(set(dims) | {"DEPTH_VIEWPOINT"})
+            from ..investigation.auditor import KIND_DIMS
+            dims = sorted(set(dims) | {"DEPTH_VIEWPOINT"} | set(sorted(KIND_DIMS.get(user["gap"].get("kind"), set()))[:1]))
         rel = {"relation": "SIMULATED: in the native crop the focal edge separates from the surrounding region by value contrast "
                            f"(crop mean {_stats(imgs[1][1])} vs frame {_stats(imgs[0][1])}) while the neighbours keep the same overlap order",
                "dimensions": dims}
@@ -200,7 +203,24 @@ def _dossier(user, imgs) -> dict:
             "scope_class": "CONDITIONAL_STYLE_RULE"}
 
 
+def _adversarial(user, imgs) -> dict:
+    """SIMULATED P5 adversarial sweep: sees the sampled native frames only (no P1 text) and names every sampled pair whose pixels
+    differ as a VISUAL_CHANGE phenomenon an observer must explain."""
+    ks = [int(l.split()[1].split(":")[1]) for l, _ in imgs]
+    st = [_stats(b) for _, b in imgs]
+    out = []
+    for (k0, s0), (k1, s1) in zip(zip(ks, st), list(zip(ks, st))[1:]):
+        d = round(sum(abs(x - y) for x, y in zip(s0, s1)), 1)
+        if d >= 1.0:
+            out.append({"kind": "VISUAL_CHANGE", "frames": [k0, k1], "entity_ids": ["sim_focal"],
+                        "why_salient": f"SIMULATED: the sampled frames {k0} and {k1} differ by mean colour {d}, so the focal form changes in between"})
+    return {"phenomena": out}
+
+
 def _frame_packet(user, imgs) -> dict:
+    """SIMULATED P1 records that ADDRESS every artistic dimension for their (synthetic) content: entity enumerated and typed, a
+    relation per entity, contact/lighting/depth/camera stated or N/A with a reason, every change described for its entity and
+    attributed, persistence justified, local audio events linked. Still SIMULATED text — wiring, not perception."""
     tg = user["target_frames"]
     by_label = {l.split()[1]: b for l, b in imgs}
     obs, prev = [], None
@@ -210,18 +230,30 @@ def _frame_packet(user, imgs) -> dict:
         m = _stats(png)
         delta: float | None = None if prev is None else round(sum(abs(a - b) for a, b in zip(m, prev)), 1)
         dims = [DIMS[k % len(DIMS)], DIMS[(k + 5) % len(DIMS)]]
+        changed = [] if (delta is not None and delta < 0.3) else [{"kind": "OBSERVED_DIFF", "entity_ids": ["sim_focal"],
+                                                                    "what": f"SIMULATED: the focal form's mean colour shifts by {delta} relative to the prior frame"}]
         rels = [{"relation": f"SIMULATED: region with mean colour {m} separates from the surrounding area through value contrast relative to the background",
-                 "dimensions": dims, "region": {"x": 8, "y": 8, "w": 32, "h": 24}},
+                 "dimensions": dims + (["ART_STATE_TRANSFORMATION"] if changed else []), "region": {"x": 8, "y": 8, "w": 32, "h": 24},
+                 "entity_ids": ["sim_focal"]},
                 {"relation": "SIMULATED: near and far parts of the focal form change together while the background structure stays constant",
-                 "dimensions": JOINTS[k % len(JOINTS)]}]
-        changed = [] if (delta is not None and delta < 0.3) else [{"kind": "OBSERVED_DIFF", "what": f"SIMULATED: mean shift {delta} relative to prior frame"}]
+                 "dimensions": JOINTS[k % len(JOINTS)], "entity_ids": ["sim_focal"]}]
+        ae = t.get("audio_events") or []
         obs.append({"frame_id": t["frame_id"], "source_sha": t["frame_id"].split(":")[0], "pts_time": t["pts_time"], "request_id": user["packet_id"],
                     "submitted_image_sha": sha256_bytes(png), "active_question_ids": [q.get("question_id") for q in user["active_questions"]],
                     "scene_and_world_state": f"SIMULATED: frame statistics {m}", "actually_visible_actor_and_object_ids": ["sim_focal"],
+                    "entity_kinds": {"sim_focal": "character"},
                     "focal_whole_artwork_state": f"SIMULATED: focal region at frame {k} keeps its outline while the setting stays behind it",
-                    "visible_design_relations": rels, "character_face_limb_contact_state": [], "visible_layer_depth_attention_state": "UNKNOWN",
-                    "changed_since_prior_frame": changed, "no_significant_change_reason": None if changed else f"SIMULATED: unchanged vs prior (delta {delta})",
-                    "simultaneous_event_links": [], "camera_vs_actor_vs_drawing_state": "UNKNOWN", "material_finish_or_colour_change": [],
+                    "visible_design_relations": rels,
+                    "character_face_limb_contact_state": {"not_applicable": "SIMULATED: the focal form shows no face, limb or contact region at this frame"},
+                    "visible_layer_depth_attention_state": "SIMULATED: the focal form sits in front of the setting layer and holds the attention region",
+                    "changed_since_prior_frame": changed,
+                    "no_significant_change_reason": None if changed else f"SIMULATED: every region keeps its colour and position relative to the prior frame (delta {delta})",
+                    "simultaneous_event_links": {"not_applicable": "SIMULATED: only one entity is visible so no simultaneous events exist here"},
+                    "camera_vs_actor_vs_drawing_state": ("SIMULATED: the focal form changes while the setting stays fixed, so the change is the drawing not the camera"
+                                                         if changed else {"not_applicable": "SIMULATED: nothing moves between this frame and the prior one"}),
+                    "material_finish_or_colour_change": {"not_applicable": "SIMULATED: flat synthetic fills carry no material or lighting change"},
+                    "audiovisual_links": [{"audio_event": e.get("kind"), "frame": e.get("frame"),
+                                           "visual_relation": "SIMULATED: the onset coincides with the frame where the focal form shifts colour"} for e in ae],
                     "native_detail_followups": [{"region": {"x": 8, "y": 8, "w": 32, "h": 24}, "reason": "SIMULATED: verify edge treatment"}] if k % 7 == 0 else [],
                     "source_fact_statements": [f"fixture tint reading at index {k}: {m}"], "subject_class": CLASSES[k % len(CLASSES)],
                     "hypothesis_or_uncertainty": ["SIMULATED"], "confidence_limitations": ["SIMULATED transport — not perception"],
@@ -292,10 +324,15 @@ def _answer(user, imgs) -> dict:
         op = rb["operation_ids"][0]
         if op not in MOTION_OPS:
             return None
-        method = {"ACTOR_ACTING": "ANTICIPATE_OVERSHOOT", "CAMERA": "EASE_IN_OUT", "ATTENTION": "HOLD_THEN_MOVE", "WORLD": "EASE_IN_OUT",
-                  "AUDIO": "CUE_ON_EVENT"}[MOTION_OPS[op]]
-        return {"track_kind": MOTION_OPS[op], "method": method, "hold_ratio": 0.25, "anticipation_ratio": 0.12, "overshoot_ratio": 0.08,
-                "witness_ids": wids[:2]}
+        # SIMULATED values: each method states EVERY parameter of its contract (vme.render.motion_program.TRACK_METHOD_PARAMS)
+        tk = MOTION_OPS[op]
+        params = {"ACTOR_ACTING": {"method": "ANTICIPATE_OVERSHOOT", "hold_ratio": 0.25, "anticipation_ratio": 0.12, "anticipation_span": 0.2,
+                                   "overshoot_ratio": 0.08, "overshoot_span": 0.15},
+                  "CAMERA": {"method": "EASE_IN_OUT"},
+                  "ATTENTION": {"method": "DIM_OTHERS", "transition_frames": 4, "hold_frames": 6, "release_frames": 4, "magnitude": 0.35},
+                  "WORLD": {"method": "PARALLAX_LAYERS", "layer_coefficients": {"far": 0.3, "mid": 0.6, "near": 0.9}},
+                  "AUDIO": {"method": "CUE_ON_EVENT", "cue_offset_frames": 0}}[tk]
+        return {"track_kind": tk, **params, "witness_ids": wids[:2]}
     base["BRANCHES"] = [{"when": rb["conditions"], "operation_id": rb["operation_ids"][0], "construction_action": action(rb),
                          "reference_policy": policy(rb), **({"MOTION_PROGRAM": program(rb)} if program(rb) else {})}
                         for rb in user["required_branches"]]

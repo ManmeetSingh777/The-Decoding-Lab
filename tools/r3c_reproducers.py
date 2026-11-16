@@ -25,11 +25,18 @@ from vme.util import Blocked  # noqa: E402
 FA = "a" * 64
 
 
-def _motion_fixture(method="ANTICIPATE_OVERSHOOT"):
+FULL = {"hold_ratio": 0.2, "anticipation_ratio": 0.1, "anticipation_span": 0.2, "overshoot_ratio": 0.1, "overshoot_span": 0.15,
+        "cue_offset_frames": 0, "transition_frames": 4, "hold_frames": 4, "release_frames": 4, "magnitude": 0.5,
+        "layer_coefficients": {"far": 0.4}}
+
+
+def _motion_fixture(method="ANTICIPATE_OVERSHOOT", *, attention=None, world=None):
+    """Every program carries the COMPLETE parameter set (older code ignores extra keys), so a defect is judged on OUTPUT, never on
+    a refusal caused by an incomplete fixture. attention/world = method name to include that track (else it is not exercised)."""
     from vme.style.coverage import OriginalScope, reverse_plan
     scope = OriginalScope(scope_id="S", subjects=[{"id": "hero", "kind": "character", "subject_kind": "biped", "actions": ["walk"]},
                                                   {"id": "moth", "kind": "character", "subject_kind": "creature", "actions": ["circle"]}],
-                          world={"kind": "space", "layers": True}, camera={"moves": True, "attention_beats": True},
+                          world={"kind": "space", "layers": bool(world)}, camera={"moves": True, "attention_beats": bool(attention)},
                           audio_cues=[{"event_id": "e1"}])
     plan = reverse_plan(scope)
     cond = {c["choice_id"]: c["conditions"] for c in plan["choices"]}
@@ -37,15 +44,15 @@ def _motion_fixture(method="ANTICIPATE_OVERSHOOT"):
 
     def mk(did, owns, op, kind, m):
         return {"decision_id": did, "status": "EXECUTABLE_CANDIDATE", "owned_choice_ids": [owns], "dimension_tags": dims[owns],
-                "branches": [{"when": cond[owns], "operation_node_ids": [op],
-                              "motion_program": {"track_kind": kind, "method": m, "hold_ratio": 0.2, "anticipation_ratio": 0.1,
-                                                 "overshoot_ratio": 0.1}}]}
+                "branches": [{"when": cond[owns], "operation_node_ids": [op], "motion_program": {"track_kind": kind, "method": m, **FULL}}]}
     decs = [mk("PC-act", "hero:acting", "op.motion_actor_track", "ACTOR_ACTING", method),
             mk("PC-act-m", "moth:acting", "op.motion_actor_track", "ACTOR_ACTING", method),
             mk("PC-cam", "camera:depth", "op.camera_attention", "CAMERA", "EASE_IN_OUT"),
-            mk("PC-att", "attention:focus", "op.attention_focus", "ATTENTION", "HOLD_THEN_MOVE"),
-            mk("PC-wld", "world:motion", "op.world_motion", "WORLD", "EASE_IN_OUT"),
             mk("PC-aud", "audio_timing", "op.audio_cue", "AUDIO", "CUE_ON_EVENT")]
+    if attention:
+        decs.append(mk("PC-att", "attention:focus", "op.attention_focus", "ATTENTION", attention))
+    if world:
+        decs.append(mk("PC-wld", "world:motion", "op.world_motion", "WORLD", world))
     brief = {"shot_plan": {"frames": 60, "fps": 30, "plan_width": 1280, "plan_height": 720,
                            "actors": [{"id": "hero", "x": 200, "y": 180, "w": 480, "h": 480, "z": 1,
                                        "keyframes": [{"frame": 0, "x": 200}, {"frame": 59, "x": 260}]},
@@ -53,11 +60,29 @@ def _motion_fixture(method="ANTICIPATE_OVERSHOOT"):
                                        "keyframes": [{"frame": 0, "x": 900, "y": 60}, {"frame": 30, "x": 760, "y": 140},
                                                      {"frame": 59, "x": 700, "y": 100}]}],
                            "camera": [{"frame": 0, "x": 0, "y": 0, "scale": 1}, {"frame": 59, "x": 40, "y": 0, "scale": 1.05}],
-                           "attention_beats": [{"frame": 15, "actor": "hero"}, {"frame": 25, "actor": "moth"}],
                            "events": [{"event_id": "e1", "actor": "hero", "from": 20, "to": 30},
                                       {"event_id": "e2", "actor": "moth", "from": 20, "to": 40}],
                            "audio": {"required": True, "cues": [{"frame": 20, "kind": "DIRECTED_CUE", "event_id": "e2"}]}}}
+    if attention:
+        brief["shot_plan"]["attention_beats"] = [{"frame": 15, "actor": "hero", "targets": ["hero"]},
+                                                 {"frame": 30, "actor": "moth", "targets": ["moth"]}]
+    if world:
+        brief["shot_plan"]["world_layers"] = [{"id": "world", "depth": "far"}]
     return decs, scope, brief
+
+
+def _variants(*builders):
+    """Try the current-contract program first; if THIS code refuses it as an unknown method/program (older contract), use the older
+    vocabulary so the defect itself can be observed on that code."""
+    last = None
+    for b in builders:
+        try:
+            return b()
+        except Blocked as e:
+            if e.code not in ("MOTION_PROGRAM_INVALID", "UNSUPPORTED_METHOD_FOR_TRACK"):
+                raise
+            last = e
+    raise last
 
 
 def _program(decs, scope, brief):
@@ -105,8 +130,8 @@ def c02_y_keyframes_not_scaled():
 
 def c03_attention_targets_dropped():
     from vme.render.motion_program import apply_program
-    decs, scope, brief = _motion_fixture()
-    p = _program(decs, scope, brief)
+    p = _variants(lambda: _program(*_motion_fixture(attention="DIM_OTHERS")),
+                  lambda: _program(*_motion_fixture(attention="HOLD_THEN_MOVE")))
     scene = apply_program({"width": 320, "height": 180, "fps": 30, "durationInFrames": 60, "background": "#000",
                            "layers": [{"id": "hero", "src": "h.png", "x": 50, "y": 45, "w": 120, "h": 120, "z": 1},
                                       {"id": "moth", "src": "m.png", "x": 205, "y": 20, "w": 80, "h": 80, "z": 2}]}, p)
@@ -127,14 +152,11 @@ def c04_cue_on_event_equals_ease():
 
 
 def c04_fixed_world_parallax():
-    decs, scope, brief = _motion_fixture()
-    try:
-        p = _program(decs, scope, brief)
-    except Blocked as e:
-        return {"defect_present": False, "blocked": e.code}
+    p = _variants(lambda: _program(*_motion_fixture(world="PARALLAX_LAYERS")), lambda: _program(*_motion_fixture(world="EASE_IN_OUT")))
     w = next((t for t in p["tracks"] if t["kind"] == "WORLD"), None)
-    owned = bool(w) and w.get("parallax_owner") is not None
-    return {"defect_present": bool(w) and not owned, "parallax_factor": (w or {}).get("parallax_factor"),
+    # oracle: the skill's coefficient for depth 'far' is 0.4; a fixed 0.5 (or no owner) is the defect
+    used = (p.get("layer_camera_coefficients") or {}).get("world", (w or {}).get("parallax_factor"))
+    return {"defect_present": not (w and w.get("parallax_owner") == "PC-wld" and used == 0.4), "coefficient_used": used,
             "parallax_owner": (w or {}).get("parallax_owner")}
 
 
@@ -217,13 +239,21 @@ REPRODUCERS = {"C01_stage2_never_executed": c01_stage2_never_executed, "C02_y_ke
                "C10_single_fact_sufficient": c10_single_fact_sufficient}
 
 
+# the ONLY refusal codes that legitimately close each defect (fail-closed by design). Any other refusal is NOT a pass.
+CLOSING_BLOCKS = {"C04_cue_on_event_equals_ease": {"UNSUPPORTED_METHOD_FOR_TRACK"},
+                  "C08_minimal_record_validated": set(), "C08_null_pts_validated": set(), "C10_single_fact_sufficient": set()}
+
+
 def run() -> dict:
     out = {}
     for k, fn in REPRODUCERS.items():
         try:
             out[k] = fn()
         except Blocked as e:
-            out[k] = {"defect_present": False, "closed_by_block": e.code, "detail": str(e)[:300]}
+            if e.code in CLOSING_BLOCKS.get(k, set()):
+                out[k] = {"defect_present": False, "closed_by_block": e.code, "detail": str(e)[:300]}
+            else:
+                out[k] = {"defect_present": None, "BLOCKED_FOR_UNRELATED_REASON": e.code, "detail": str(e)[:300]}
         except Exception as e:  # noqa: BLE001
             out[k] = {"defect_present": None, "ERROR": repr(e)[:300], "trace": traceback.format_exc()[-1200:]}
     out.update(missing_capabilities())
