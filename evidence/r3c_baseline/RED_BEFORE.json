@@ -1,0 +1,94 @@
+{
+ "git_head": "6f885dfb33c5f4ace974abc7d36034abd0f14f8c",
+ "results": {
+  "C01_stage2_never_executed": {
+   "defect_present": true,
+   "image_requests_sent": 1,
+   "required_reference_shas": 3,
+   "never_submitted_reference_shas": 1
+  },
+  "C02_y_keyframes_not_scaled": {
+   "defect_present": true,
+   "first_moth_y_keyframe": 60,
+   "expected": 15.0
+  },
+  "C03_attention_targets_dropped": {
+   "defect_present": true,
+   "per_layer_attention_consumed": {
+    "hero": false,
+    "moth": false
+   },
+   "scene_level_attention_keys": [
+    "attention"
+   ]
+  },
+  "C04_cue_on_event_equals_ease": {
+   "defect_present": true,
+   "cue_on_event_keys": [
+    {
+     "frame": 30,
+     "x": 100.0,
+     "easing": "ease_in_out"
+    }
+   ],
+   "ease_keys": [
+    {
+     "frame": 30,
+     "x": 100.0,
+     "easing": "ease_in_out"
+    }
+   ]
+  },
+  "C04_fixed_world_parallax": {
+   "defect_present": true,
+   "parallax_factor": 0.5,
+   "parallax_owner": null
+  },
+  "C06_same_frame_cues_deduplicated": {
+   "defect_present": true,
+   "cues_at_frame_20": [
+    {
+     "frame": 20,
+     "event_id": "e2",
+     "kind": "DIRECTED_CUE"
+    }
+   ]
+  },
+  "C08_minimal_record_validated": {
+   "defect_present": true,
+   "status": "VALIDATED",
+   "problems": []
+  },
+  "C08_null_pts_validated": {
+   "defect_present": true,
+   "status": "VALIDATED",
+   "problems": []
+  },
+  "C10_single_fact_sufficient": {
+   "defect_present": true,
+   "verdict": "SUFFICIENT_FOR_PRODUCING_CHOICE",
+   "reasons": []
+  },
+  "C05_part_rig_route": {
+   "defect_present": true
+  },
+  "C06_transcript_index": {
+   "defect_present": true
+  },
+  "C07_inspect_range": {
+   "defect_present": true
+  },
+  "C07_search_events": {
+   "defect_present": true
+  },
+  "C09_state_inventory": {
+   "defect_present": true
+  },
+  "C11_readiness_stages": {
+   "defect_present": true
+  },
+  "C10_visual_qualification": {
+   "defect_present": true
+  }
+ }
+}
