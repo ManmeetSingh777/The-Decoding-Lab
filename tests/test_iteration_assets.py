@@ -112,6 +112,12 @@ def test_shot_plan_change_reruns_only_asset_stage_and_blocks_unproducible_demand
     st.close()
 
 
+def _man(st, ids):
+    return {"submitted_witness_ids": sorted(ids), "byte_manifest": [{"witness_id": w, "source_sha256": st.get("Witness", w)["film_sha256"],
+                                                                     "frame_index": st.get("Witness", w)["frame_start"], "region": None}
+                                                                    for w in ids]}
+
+
 def _s8_runner(ws, sp, pack):
     from vme.loop.real import RealLoopRunner, RealProviders
     prov = RealProviders(vision_client_factory=lambda: None, vision_transport_kind="SIMULATED", image_transport=None,
@@ -127,7 +133,8 @@ def _s8_runner(ws, sp, pack):
 
 @pytest.mark.req("R20", "ST28-16")
 def test_renderer_refuses_undirected_actor_and_missing_event_state(ws):
-    pack = {"world_plate": {"path": "x.png"}, "canonical": {"actor_id": "hero", "path": "c.png", "sha256": "0" * 64}, "states": {}}
+    canon = {"actor_id": "hero", "path": "c.png", "sha256": "0" * 64}
+    pack = {"world_plate": {"path": "x.png"}, "canonical": canon, "canonical_by_actor": {"hero": canon}, "states": {}}
     r, st = _s8_runner(ws, {"frames": 60, "events": []}, pack)
     status, out = r._s8(st)
     assert status == "STOPPED" and out["stop_reason"] == "SHOT_PLAN_NOT_DIRECTED"          # never a default x=55% actor
@@ -149,12 +156,14 @@ def test_world_plate_operation_sends_setting_only(tmp_path, store):
                                  "evidence_kind": "FULL_FRAME", "observer": "VLM", "visible_relation": "SYNTHETIC: far layers recede behind near ones",
                                  "dimensions": ["WORLD_ASSEMBLY"], "scene_specific_facts": [], "observation_ids": [], "limits": "t",
                                  "subject_class": "landscape", "evidence_origin": "SIMULATED_VLM_TRANSPORT"})
-    ans = {"answer_status": "INFERRED", "SOURCE_VISIBLE_FACTS": [{"relation": "SYNTHETIC: near and far layers separate by value steps", "witness_ids": ["W-w"]}],
+    ans = {"answer_status": "INFERRED", "SOURCE_VISIBLE_FACTS": [{"relation": "SYNTHETIC: near and far layers separate by value steps while the focal area stays open", "witness_ids": ["W-w"]}],
            "CONSTRUCTION_EXPLANATION": "SYNTHETIC: depth planes are separated by value", "WHEN_NOT_APPLICABLE": ["diagrams"], "ADAPTS_WITH": ["scale"],
            "REMAINING_UNKNOWN": ["x"], "BRANCHES": [{"when": {"environment": "underwater"}, "operation_id": "op.world_plate",
-                                                     "construction_action": "SYNTHETIC: paint the {setting} as an empty plate with stepped depth layers"}]}
+                                                     "construction_action": "SYNTHETIC: paint the {setting} as an empty plate whose near layers separate from far layers by value steps",
+                                                     "reference_policy": {"mode": "NOT_APPLICABLE", "reason": "SYNTHETIC: plate decision carried by clause"}}]}
     did = production_choice_id("world:clean_plate", "plate")
-    d = author_decision(store, {"question_id": "Q", "exact_artistic_unknown": "t", "observed_contrast_with_witness_ids": []}, ans,
+    d = author_decision(store, {"question_id": "Q", "exact_artistic_unknown": "t", "observed_contrast_with_witness_ids": [],
+                                "owner_stage": "STYLE_CONDITIONS"}, ans, authorized_submission_manifest=_man(store, ["W-w"]),
                         dims=["WORLD_ASSEMBLY"], registered_ops=registered(), required_branches=[], decision_id=did,
                         owned_choice_ids=["world:clean_plate"], phenomenon="plate")
     oc = {"op.world_plate": {"width": 1536, "height": 864, "format": "PNG", "asset_kind": "WORLD_PLATE"}}
@@ -165,8 +174,10 @@ def test_world_plate_operation_sends_setting_only(tmp_path, store):
     p = job.logical_payload["positivePrompt"]
     assert "Original setting" in p and "Original subject" not in p and "deep-sea research explorer" not in p
     bad = dict(ans, BRANCHES=[{"when": {"environment": "underwater"}, "operation_id": "op.world_plate",
-                               "construction_action": "SYNTHETIC: paint the {setting} around the {subject}"}])
-    d2 = author_decision(store, {"question_id": "Q2", "exact_artistic_unknown": "t", "observed_contrast_with_witness_ids": []}, bad,
+                               "construction_action": "SYNTHETIC: paint the {setting} with near layers in front of the {subject} and far layers behind",
+                               "reference_policy": {"mode": "NOT_APPLICABLE", "reason": "SYNTHETIC"}}])
+    d2 = author_decision(store, {"question_id": "Q2", "exact_artistic_unknown": "t", "observed_contrast_with_witness_ids": [],
+                                 "owner_stage": "STYLE_CONDITIONS"}, bad, authorized_submission_manifest=_man(store, ["W-w"]),
                          dims=["WORLD_ASSEMBLY"], registered_ops=registered(), required_branches=[], decision_id=production_choice_id("world:p2", "p2"),
                          owned_choice_ids=["world:p2"], phenomenon="p2")
     res2 = publish_skill_version(tmp_path / "sk2", [d2], skill_id="t", version="0.1", evidence_origin="SIMULATED_VLM_TRANSPORT",

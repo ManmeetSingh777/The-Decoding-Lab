@@ -140,7 +140,8 @@ def test_render_refused_before_approval_then_real_remotion_after(store, tmp_path
     scene = {"width": 320, "height": 180, "fps": 30, "durationInFrames": 30, "camera": {"keyframes": [{"frame": 0, "x": 0, "y": 0, "scale": 1}]},
              "layers": [{"id": "bg", "src": "bg.png", "x": 0, "y": 0, "w": 320, "h": 180, "z": 0},
                         {"id": "d", "src": "disc.png", "x": 10, "y": 70, "w": 40, "h": 40, "z": 1,
-                         "keyframes": [{"frame": 0, "x": 10}, {"frame": 29, "x": 260}]}]}
+                         "keyframes": [{"frame": 0, "x": 10}, {"frame": 29, "x": 260}]}],
+             "motion_contract": {"expected_independent_motion": True}}      # R3 F15: integrated renders state their expectation
     assets = {"bg.png": bg, "disc.png": str(disc)}
     gk = GateKeeper(store)
     _to_review(gk, "rv")

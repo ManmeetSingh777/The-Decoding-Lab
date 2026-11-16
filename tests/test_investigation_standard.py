@@ -45,7 +45,9 @@ def _obs(m, **over):
              scene_and_world_state="SYNTHETIC world", focal_whole_artwork_state=f"SYNTHETIC: focal form at {m['frame_id']} stays in front of the far layer",
              visible_layer_depth_attention_state="UNKNOWN", camera_vs_actor_vs_drawing_state="UNKNOWN",
              changed_since_prior_frame=[{"kind": "OBSERVED_DIFF", "what": "SYNTHETIC: near hand moves toward the handle"}],
-             persistent_state_ids=["actor_1"])
+             persistent_state_ids=["actor_1"],
+             visible_design_relations=[{"relation": f"SYNTHETIC: at {m['frame_id']} the near hand overlaps the far handle edge while the "
+                                                    "background layer stays behind", "dimensions": ["CHARACTER_BODY_HAND_CONTACT"]}])
     o.update(over)
     return o
 

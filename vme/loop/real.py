@@ -253,14 +253,14 @@ class RealLoopRunner:
                      selection: dict, controlling_problem: dict | None = None, active_cluster: dict | None = None,
                      competing: list | None = None, required_response: dict | None = None):
         """Every source-analysis request goes through vision.dispatch (P0 + Pn, typed binding, verified byte manifest) (R3 F06)."""
-        from ..vision.dispatch import prepare_verified_request, send
+        from ..vision.dispatch import prepare_verified_request, submit_source_request
         prep = prepare_verified_request(pass_id=pass_id, kind=kind, shape=shape, source_shas=sorted({i["source_sha256"] for i in images}),
                                         selection=selection, images=images[: vis.caps.max_images_per_request], prior_boundary=None,
                                         active_cluster=active_cluster, controlling_problem=controlling_problem, competing_explanations=competing,
                                         required_response=required_response or {"strict_json": True},
                                         provider_profile={"model": vis.caps.model_id, "max_images": vis.caps.max_images_per_request,
                                                           "max_output_tokens": vis.max_output_tokens}, payload=payload)
-        return send(vis, task_id, prep), prep
+        return submit_source_request(vis, task_id, prep), prep
 
     @staticmethod
     def _img(role: str, film: str, fr, *, wid: str | None = None, label: str, png: bytes | None = None, region: dict | None = None,
@@ -1496,7 +1496,6 @@ class RealLoopRunner:
         if gk.state(self.run_id)["state"] == "AWAITING_VIDEO_REVIEW":
             prev = (st.get("LoopTransition", f"{self.run_id}:S8") or {}).get("outputs", {})
             return "COMPLETED", prev
-        s4 = self._out(st, "S4")
         s7 = (st.get("LoopTransition", f"{self.run_id}:S7") or {})["outputs"]
         pack = read_json(s7["pack"])
         brief = self._brief(st)
@@ -1511,8 +1510,6 @@ class RealLoopRunner:
         if problems:
             return "STOPPED", {"stop_reason": "SHOT_PLAN_NOT_DIRECTED", "problems": problems}
         scale = W / float(sp.get("plan_width", W))
-        scope = OriginalScope(scope_id=brief["brief_id"], **brief["scope"])
-        skill_decs = json.loads((Path(s4["skill_folder"]) / "decisions.json").read_text(encoding="utf-8"))
         assets = {"world_plate.png": pack["world_plate"]["path"]}
         layers = [{"id": "world", "src": "world_plate.png", "x": 0, "y": 0, "w": W, "h": H, "z": 0}]
         event_trace = []
@@ -1539,6 +1536,9 @@ class RealLoopRunner:
                 event_trace.append({"event": ev.get("event_id"), "actor": a["id"], "state": ev["state"], "asset_sha256": stt["sha256"],
                                     "frames": [ev["from"], ev["to"]]})
             layers.append(lay)
+        s4 = self._out(st, "S4")
+        scope = OriginalScope(scope_id=brief["brief_id"], **brief["scope"])
+        skill_decs = json.loads((Path(s4["skill_folder"]) / "decisions.json").read_text(encoding="utf-8"))
         prog = compile_event_program(decisions=skill_decs, scope=scope, brief=brief, pack=pack, width=W, height=H, scale=scale)
         st.put("EventProgram", self.run_id, prog)
         scene = apply_program({"width": W, "height": H, "fps": fps, "durationInFrames": n, "background": "#000000",

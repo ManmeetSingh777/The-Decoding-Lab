@@ -132,7 +132,22 @@ def synthetic_problem() -> dict:
 
 
 def fixture_answer(q) -> dict:
-    """SYNTHETIC answerer standing in for an authorized VLM/human answer. Labelled; never real evidence."""
+    """SYNTHETIC answerer standing in for an authorized VLM/human answer. Labelled; never real evidence.
+    R3 F04: it may cite ONLY the witnesses the question actually supplied (never self-added ids)."""
+    a = _fixture_answer_raw(q)
+    planned = set(getattr(q, "observed_contrast_with_witness_ids", []) or [])
+    if a.get("SOURCE_VISIBLE_FACTS"):
+        facts = []
+        for f in a["SOURCE_VISIBLE_FACTS"]:
+            ids = [w for w in f["witness_ids"] if w in planned] or sorted(planned)[:1]
+            if ids:
+                facts.append({**f, "witness_ids": ids})
+        a["SOURCE_VISIBLE_FACTS"] = facts
+    a["answer_evidence_ids"] = sorted({w for f in a.get("SOURCE_VISIBLE_FACTS") or [] for w in f["witness_ids"]})
+    return a
+
+
+def _fixture_answer_raw(q) -> dict:
     base = {"answer_status": "UNKNOWN", "answerer": "SYNTHETIC_FIXTURE",
             **{k: None for k in ("SOURCE_VISIBLE_FACTS", "IMPORTANT_LINKED_CHANGES", "CONSTRUCTION_EXPLANATION", "WHY_THE_DECISION_MATTERS",
                                  "WHEN_APPLICABLE", "WHEN_NOT_APPLICABLE", "ACTUAL_PRODUCING_OPERATION",

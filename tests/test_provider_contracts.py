@@ -75,10 +75,44 @@ def _img():
     return b.getvalue()
 
 
+def _prep(ad):
+    """A P5 source request built by the ONE verified dispatcher (R3 F06): exact byte manifest, protocol text, binding."""
+    from vme.vision.dispatch import image_entry, prepare_verified_request
+    film = "f" * 64
+    imgs = [image_entry(role="TARGET", png=_img(), witness_id=f"{film[:16]}:1", source_sha256=film, frame_index=1, pts=1 / 30,
+                        width=64, height=36, label="FULL f:1"),
+            image_entry(role="NATIVE_CROP", png=_img(), witness_id=f"{film[:16]}:1:crop", source_sha256=film, frame_index=1, pts=1 / 30,
+                        width=64, height=36, region={"x": 0, "y": 0, "w": 64, "h": 36}, label="NATIVE_CROP f:1")]
+    return prepare_verified_request(pass_id="P5", kind="native_detail", shape="SYNTHETIC test shape", source_shas=[film],
+                                    selection={"test": True}, images=imgs, prior_boundary=None, active_cluster=None, controlling_problem=None,
+                                    competing_explanations=None, required_response={"strict_json": True},
+                                    provider_profile={"model": ad.caps.model_id}, payload={"reason": "r", "frame": 1})
+
+
 def _ask(ad, tid="vme_nd_" + "0" * 40):
-    payload = json.dumps({"reason": "r", "frame": 1})
-    return ad.request_json(tid, "native_detail", "SYS", payload, [("FULL f:1", _img(), 64, 36), ("NATIVE_CROP f:1", _img(), 64, 36)],
-                           source_shas=["f" * 64])
+    from vme.vision.dispatch import submit_source_request
+    return submit_source_request(ad, tid, _prep(ad))
+
+
+@pytest.mark.req("R3-F06", "R3-F09")
+def test_source_request_without_verified_manifest_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setenv("VME_ALLOW_NETWORK", "1")
+    ad, client, _ = _vision(tmp_path)
+    prep = _prep(ad)
+    with pytest.raises(Blocked) as e:
+        ad.request_json("vme_nd_" + "1" * 40, "native_detail", prep["system"], prep["user_text"], prep["labelled_images"],
+                        source_shas=prep["source_shas"])
+    assert e.value.code == "SOURCE_REQUEST_WITHOUT_VERIFIED_MANIFEST"
+    with pytest.raises(Blocked) as e:          # bytes swapped after the manifest was built
+        ad.request_json("vme_nd_" + "2" * 40, "native_detail", prep["system"], prep["user_text"],
+                        [(l, b + b"x", w, h) for l, b, w, h in prep["labelled_images"]], source_shas=prep["source_shas"], manifest=prep)
+    assert e.value.code == "SENT_BYTES_DIFFER_FROM_MANIFEST"
+    with pytest.raises(Blocked) as e:          # system text edited after the manifest was built
+        ad.request_json("vme_nd_" + "3" * 40, "native_detail", prep["system"] + " be generous", prep["user_text"], prep["labelled_images"],
+                        source_shas=prep["source_shas"], manifest=prep)
+    assert e.value.code == "REQUEST_DIFFERS_FROM_VERIFIED_MANIFEST"
+    assert client.billed_requests() == 0
+    assert "pass=P5" in prep["system"] and prep["protocol_sha"] in prep["system"]
 
 
 @pytest.mark.req("R01")

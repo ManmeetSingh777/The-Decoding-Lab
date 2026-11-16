@@ -154,12 +154,12 @@ def reverse_plan(scope: OriginalScope) -> dict:
         need("camera:depth", ["DEPTH_VIEWPOINT"], "world_layers", "camera_attention", conditions=dict(envc))
         if w.get("layers"):
             need("world:motion", ["WORLD_ASSEMBLY", "DEPTH_VIEWPOINT"], "world_layers", "world_motion", conditions=dict(envc))
-    if cam.get("attention_beats") or len([x for x in scope.subjects if x.get("kind") == "character"]) > 1:
-        need("attention:focus", ["SIMULTANEOUS_CHOREOGRAPHY"], "scene_graph", "attention_focus", conditions=dict(envc))
         if cam.get("scale_change"):
             need("camera:state_change", ["ART_STATE_TRANSFORMATION", "DEPTH_VIEWPOINT"], "whole_scene", "whole_scene")
             joints.append({"joint_id": "camera+art_states", "dimensions": ["DEPTH_VIEWPOINT", "ART_STATE_TRANSFORMATION"],
                            "seed": "transition_between_worlds"})
+    if cam.get("attention_beats") or len([x for x in scope.subjects if x.get("kind") == "character"]) > 1:
+        need("attention:focus", ["SIMULTANEOUS_CHOREOGRAPHY"], "scene_graph", "attention_focus", conditions=dict(envc))
     if len({a for e in scope.events for a in e.get("actors", [])}) > 1:
         need("events:choreography", ["SIMULTANEOUS_CHOREOGRAPHY"], "scene_graph", "motion_actor_track", conditions=dict(envc))
     if scope.transitions:

@@ -79,7 +79,7 @@ def prepare_verified_request(*, pass_id: str, kind: str, shape: str, source_shas
             "evidence_status": ["LOCAL_BYTES_VERIFIED"]}
 
 
-def send(vis, task_id: str, prepared: dict, *, auth_task: str = "source_vision") -> dict:
+def submit_source_request(vis, task_id: str, prepared: dict, *, auth_task: str = "source_vision") -> dict:
     """Submit through the adapter's durable journal; the journal keeps the exact manifest/system/user digests."""
     return vis.request_json(task_id, prepared["kind"], prepared["system"], prepared["user_text"], prepared["labelled_images"],
                             source_shas=prepared["source_shas"], auth_task=auth_task, manifest=prepared)

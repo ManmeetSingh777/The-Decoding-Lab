@@ -109,7 +109,8 @@ class MockVisionProvider:
                 "visible_layer_depth_attention_state": "UNKNOWN (mock)", "changed_since_prior_frame": changed,
                 "no_significant_change_reason": None if changed else f"MOCK: mean colour unchanged vs prior frame (delta {delta})",
                 "simultaneous_event_links": [], "camera_vs_actor_vs_drawing_state": "UNKNOWN",
-                "material_finish_or_colour_change": [], "native_detail_followups": [], "source_fact_statements": [],
+                "material_finish_or_colour_change": [], "native_detail_followups": [],
+                "source_fact_statements": [f"MOCK_ONLY measured mean RGB {mean} compared with the prior frame (delta {delta})"],
                 "hypothesis_or_uncertainty": ["MOCK provider: no perception claims"], "confidence_limitations": ["MOCK"],
                 "persistent_state_ids": [], "unexplained_phenomena": [],
             })

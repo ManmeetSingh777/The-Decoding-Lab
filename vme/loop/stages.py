@@ -335,6 +335,9 @@ class LoopRunner:
         s7 = self._out(st, "S7")
         pack = read_json(s7["pack"])
         scene, assets = fx.fixture_scene_from_pack(pack)
+        # R3 F15: an integrated render must state its motion expectation; this SYNTHETIC fixture scene is built to move
+        scene["motion_contract"] = {"expected_independent_motion": True,
+                                    "source": "SYNTHETIC fixture scene graph (engineering loop; not learned motion)"}
         rep = render_video(scene, assets, self.dir / "integrated_fixture.mp4", gate=GateKeeper(st), run_id=self.run_id)
         st.put("RenderReport", self.run_id, rep)
         if not rep["motion"]["ok"]:
