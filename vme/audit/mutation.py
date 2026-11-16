@@ -112,7 +112,7 @@ def _copy_repo(dst: Path) -> None:
             shutil.copy2(REPO / f, dst / f)
     rem = REPO / "render" / "remotion"                  # renderer project (code only; node_modules is linked, never copied)
     if rem.exists():
-        shutil.copytree(rem, dst / "render" / "remotion", ignore=shutil.ignore_patterns("node_modules", "public", "out"))
+        shutil.copytree(rem, dst / "render" / "remotion", ignore=shutil.ignore_patterns("node_modules", "public", "public_jobs", "out"))
         nm = rem / "node_modules"
         if nm.exists():
             link = dst / "render" / "remotion" / "node_modules"

@@ -8,13 +8,15 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const [sceneFile, outFile] = process.argv.slice(2);
+const [sceneFile, outFile, publicDirArg] = process.argv.slice(2);
 if (!sceneFile || !outFile) {
-  console.error('usage: node render.mjs <scene.json> <out.mp4>');
+  console.error('usage: node render.mjs <scene.json> <out.mp4> [<private public dir>]');
   process.exit(2);
 }
 const scene = JSON.parse(fs.readFileSync(sceneFile, 'utf8'));
-const serveUrl = await bundle({entryPoint: path.join(here, 'src', 'index.jsx'), publicDir: path.join(here, 'public')});
+// each render bundles ONLY its own private public dir (never a folder other concurrent renders write into)
+const publicDir = publicDirArg ? path.resolve(publicDirArg) : path.join(here, 'public');
+const serveUrl = await bundle({entryPoint: path.join(here, 'src', 'index.jsx'), publicDir});
 const inputProps = {scene};
 const composition = await selectComposition({serveUrl, id: 'VMESceneGraph', inputProps});
 await renderMedia({composition, serveUrl, codec: 'h264', outputLocation: outFile, inputProps, logLevel: 'error'});

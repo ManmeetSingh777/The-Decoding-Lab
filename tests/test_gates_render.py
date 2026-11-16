@@ -157,6 +157,40 @@ def test_render_refused_before_approval_then_real_remotion_after(store, tmp_path
     assert gk.state("rv")["state"] == "AWAITING_VIDEO_REVIEW"
 
 
+@pytest.mark.req("R3-F15")
+def test_each_render_bundles_only_its_own_private_asset_dir(tmp_path, monkeypatch):
+    """Regression: a SHARED public folder let concurrent renders bundle another render's half-written image (blank layer →
+    TECHNICAL_MOTION_FAILED under load). Two renders of the SAME scene must get distinct private dirs holding exact bytes,
+    removed afterwards."""
+    import subprocess as sp
+    from vme.render import renderer
+    p = _texture(tmp_path / "tex.png", 640, 180)
+    scene = {"width": 320, "height": 180, "fps": 30, "durationInFrames": 20,
+             "camera": {"keyframes": [{"frame": 0, "x": 0, "y": 0, "scale": 1}, {"frame": 19, "x": 38, "y": 0, "scale": 1}]},
+             "layers": [{"id": "tex", "src": "tex.png", "x": 0, "y": 0, "w": 640, "h": 180, "z": 0,
+                         "keyframes": [{"frame": 0, "x": 0}, {"frame": 19, "x": 0}]}]}
+    assert validate_scene_graph(scene) == []
+    seen = []
+
+    def fake_run(args, **kw):
+        pub = Path(args[4])
+        seen.append({"pub": pub, "files": sorted(x.name for x in pub.iterdir()),
+                     "same_bytes": (pub / "tex.png").read_bytes() == p.read_bytes(),
+                     "scene_src": json.loads((pub / "scene.json").read_text(encoding="utf-8"))["layers"][0]["src"]})
+        return sp.CompletedProcess(args, 1, "", "stop after capture")
+    monkeypatch.setattr(renderer.subprocess, "run", fake_run)
+    monkeypatch.setattr(renderer, "require_tool", lambda n: n)
+    for _ in range(2):
+        with pytest.raises(Blocked) as e:
+            render_video(scene, {"tex.png": str(p)}, tmp_path / "x.mp4", diagnostic_label="DIAGNOSTIC_NOT_APPROVED")
+        assert e.value.code == "RENDER_ENGINE"
+    if not seen:
+        pytest.skip("remotion not installed (render refused before bundling)")
+    assert len(seen) == 2 and seen[0]["pub"] != seen[1]["pub"]
+    assert all(s["same_bytes"] and s["files"] == ["scene.json", "tex.png"] and s["scene_src"] == "tex.png" for s in seen)
+    assert not any(s["pub"].exists() for s in seen)                          # private dir removed after the render
+
+
 @pytest.mark.req("C26", "B34", "A25", "C27", "C28")
 def test_pan_only_video_not_counted_as_animation(tmp_path):
     from vme.render.renderer import REMOTION_DIR

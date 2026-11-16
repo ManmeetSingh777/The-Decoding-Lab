@@ -145,13 +145,18 @@ def render_video(scene: dict, assets: dict, out_mp4: str | Path, *, gate=None, r
     if not (REMOTION_DIR / "node_modules" / "remotion").exists():
         raise Blocked("RENDER_ENGINE_NOT_INSTALLED", "run npm install in render/remotion")
     job = digest({"scene": scene, "assets": {k: sha256_file(v) for k, v in assets.items()}})[:16]
-    pub = REMOTION_DIR / "public" / f"job_{job}"
-    pub.mkdir(parents=True, exist_ok=True)
+    # PRIVATE public dir per render: a shared public folder let concurrent renders bundle another render's half-written / locked
+    # image, which rendered a blank layer (caught as TECHNICAL_MOTION_FAILED). Nothing outside this render can touch these bytes.
+    import tempfile
+    (REMOTION_DIR / "public_jobs").mkdir(exist_ok=True)
+    pub = Path(tempfile.mkdtemp(prefix=f"job_{job}_", dir=REMOTION_DIR / "public_jobs"))
     remap = {}
     for src, local in assets.items():
         dst = pub / Path(src).name
         shutil.copyfile(local, dst)
-        remap[src] = f"job_{job}/{Path(src).name}"
+        if sha256_file(dst) != sha256_file(local):
+            raise Blocked("RENDER_ASSET_COPY_MISMATCH", str(src))
+        remap[src] = Path(src).name
 
     def rw(ls):
         for l in ls:
@@ -166,8 +171,11 @@ def render_video(scene: dict, assets: dict, out_mp4: str | Path, *, gate=None, r
     node = require_tool("node")
     out_mp4 = Path(out_mp4)
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run([node, "render.mjs", str(scene_file), str(out_mp4.resolve())], cwd=str(REMOTION_DIR),
-                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
+    try:
+        r = subprocess.run([node, "render.mjs", str(scene_file), str(out_mp4.resolve()), str(pub)], cwd=str(REMOTION_DIR),
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
+    finally:
+        shutil.rmtree(pub, ignore_errors=True)
     if r.returncode != 0:
         raise Blocked("RENDER_ENGINE", r.stderr[-600:])
     verify = ffprobe_verify(out_mp4, scene)
