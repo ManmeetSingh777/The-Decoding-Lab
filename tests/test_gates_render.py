@@ -215,14 +215,18 @@ def test_review_page_and_feedback_persist(store, tmp_path):
     from vme.review.server import serve
     img = _img(tmp_path / "i.png", (5, 5, 5))
     srv = serve(store, "rr", images=[{"path": img, "sha256": sha256_file(img), "label": "OFFLINE_FIXTURE_NOT_LEARNED_ART"}],
-                packet={"gate": "x"}, port=8799, once=True)
+                packet={"gate": "x"}, port=0, once=True)          # ephemeral: concurrent suites never share a port
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
     try:
-        html = urllib.request.urlopen("http://127.0.0.1:8799/").read().decode()
+        html = urllib.request.urlopen(base + "/").read().decode()
         assert "SYNTHETIC / OFFLINE FIXTURE" in html and "Which important visual qualities" in html
         data = urllib.parse.urlencode({"run_id": "rr", "verdict": "PARTIAL", "gaps": "face\nhands", "focus": "hands", "by": "test-user"}).encode()
-        r = json.loads(urllib.request.urlopen("http://127.0.0.1:8799/feedback", data=data).read())
+        r = json.loads(urllib.request.urlopen(base + "/feedback", data=data).read())
         rec = store.get("VisualReview", r["saved"])
         assert rec["verdict"] == "PARTIAL" and rec["top_remaining_gaps"] == ["face", "hands"]
+        # a second review server can never silently share this port (Windows SO_REUSEADDR would allow it)
+        with pytest.raises(OSError):
+            serve(store, "rr2", images=[], packet={}, port=srv.server_address[1], once=True).shutdown()
     finally:
         srv.shutdown()
     with pytest.raises(Blocked):

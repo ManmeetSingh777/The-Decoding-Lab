@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import json
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -105,7 +106,11 @@ def serve(store, run_id: str, *, images: list[dict], packet: dict, port: int = 8
             self.end_headers()
             self.wfile.write(body)
 
-    srv = ThreadingHTTPServer(("127.0.0.1", port), H)
+    class _Server(ThreadingHTTPServer):
+        # On Windows SO_REUSEADDR lets a SECOND process bind the same port and silently receive this review's requests;
+        # refuse that so a busy port fails loudly (port=0 picks a free port; the bound port is srv.server_address[1]).
+        allow_reuse_address = sys.platform != "win32"
+    srv = _Server(("127.0.0.1", port), H)
     if once:
         t = threading.Thread(target=srv.serve_forever, daemon=True)
         t.start()
