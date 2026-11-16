@@ -42,6 +42,6 @@ def test_real_films_indexed_but_zero_vlm_seen():
     if not db.exists() or not summ.exists():
         pytest.skip("real workspace absent")
     con = sqlite3.connect(str(db))
-    n = con.execute("SELECT COUNT(*) FROM frame_vision WHERE status='VISION_OUTPUT_VERIFIED'").fetchone()[0]
+    n = con.execute("SELECT COUNT(*) FROM frame_vision WHERE status IN ('VISION_OUTPUT_VERIFIED','RESPONSE_IDENTITY_BOUND')").fetchone()[0]
     con.close()
     assert n == 0 and json.loads(summ.read_text(encoding="utf-8"))["total_frames_decoded"] > 0

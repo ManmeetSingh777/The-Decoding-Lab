@@ -136,7 +136,7 @@ def cmd_vision(a):
             rows = st.conn.execute("SELECT pass_id, status, COUNT(*) FROM frame_vision GROUP BY pass_id, status").fetchall()
             summ = read_json(ws.state_dir / "FRAME_INDEX_SUMMARY.json") if (ws.state_dir / "FRAME_INDEX_SUMMARY.json").exists() else {}
             _p({"indexed_total": summ.get("total_frames_decoded"), "vision_rows": rows,
-                "real_vlm_seen": sum(r[2] for r in rows if r[1] == "VISION_OUTPUT_VERIFIED")})
+                "real_vlm_seen": sum(r[2] for r in rows if r[1] == "RESPONSE_IDENTITY_BOUND")})
         elif a.action in ("run", "plan", "resume"):
             st.close()
             from .cli_real import run_real

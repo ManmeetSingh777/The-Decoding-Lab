@@ -21,8 +21,8 @@ CHAR_FIELDS = ("whole_design", "outer_contour_and_taper", "negative_spaces", "vi
                "lighting_and_shadows", "view_and_pose_redraws", "contact_and_occlusion", "world_integration")
 SCOPE_CLASSES = ("STYLE_INVARIANT_CANDIDATE", "CONDITIONAL_STYLE_RULE", "CHARACTER_IDENTITY_RULE", "SHOT_OR_EVENT_RULE",
                  "UNKNOWN_OR_CONTRADICTED")
-_GENERIC_ANATOMY = re.compile(r"\b(tube|tubular|cylinder|stick (arm|limb)|mitten|generic (hand|face|skeleton)|standard (human|anatomy)|"
-                              r"skeleton|bone rig|default shading|stock face)\b", re.I)
+_GENERIC_ANATOMY = re.compile(r"\b(tubes?|tubular|cylinders?|cylindrical|stick (arms?|limbs?)|mittens?|generic (hands?|faces?|skeleton)|"
+                              r"standard (human|anatomy)|skeletons?|bone rig|default shading|stock faces?|sausage limbs?)\b", re.I)
 
 
 def validate_character_art_study(dossier: dict, authorized: set[str]) -> list[str]:

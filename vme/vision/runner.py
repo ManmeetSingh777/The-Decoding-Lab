@@ -300,7 +300,7 @@ class PacketRunner:
         with self.store.tx() as c:
             for o, m in zip(sorted(v["observations"], key=lambda x: int(x["frame_id"].split(":")[1])), tgt):
                 tk = getattr(self.provider, "transport_kind", "NETWORK")
-                status = ("VISION_OUTPUT_VERIFIED" if self.provider.kind == "REAL" and tk == "NETWORK" else
+                status = ("RESPONSE_IDENTITY_BOUND" if self.provider.kind == "REAL" and tk == "NETWORK" else   # R3 F09: identity, not understanding
                           "SIMULATED_TRANSPORT_FIXTURE" if self.provider.kind == "REAL" else "MOCK_VERIFIED_SYNTHETIC")
                 c.execute("INSERT OR REPLACE INTO frame_vision(film_sha256,frame_index,pass_id,status,packet_id,image_sha,"
                           "observation_sha,updated_at) VALUES(?,?,?,?,?,?,?,?)",
@@ -345,4 +345,5 @@ def coverage_for_range(store: Store, film_sha: str, pass_id: str, start: int, en
     from ..reference.frame_index import ranges
     return {"expected": len(expected), "verified": len(seen), "missing_count": len(missing),
             "missing_ranges": ranges(missing), "statuses": sorted(set(seen.values())),
-            "complete": not missing, "real_vlm": all(s == "VISION_OUTPUT_VERIFIED" for s in seen.values()) and bool(seen)}
+            "complete": not missing, "real_vlm": all(s == "RESPONSE_IDENTITY_BOUND" for s in seen.values()) and bool(seen),
+            "artistic_status": "ARTISTIC_CLAIM_UNVERIFIED (needs SOURCE_ART_REVIEW)"}
