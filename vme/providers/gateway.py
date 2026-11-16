@@ -338,11 +338,24 @@ class OfflineRecordingTransport:
         return fetch
 
     def _image(self, body: bytes, w: int, h: int) -> bytes:
-        im = Image.new("RGB", (w, h), (int(sha256_bytes(body)[:2], 16), 90, 120))
+        # Derived from the LOGICAL request only (the per-run random taskUUID is excluded): the same request always yields the
+        # same bytes, and different requests differ VISIBLY (full-RGB fill + a hash-placed block). Hashing the raw body made
+        # the colour random per run, so two drawing states sometimes came out near-identical and the motion gate (correctly)
+        # judged the swap STATIC — a fixture flake, not an engine fault.
+        try:
+            tasks = json.loads(body)
+            logical = canonical_json([{k: v for k, v in t.items() if k != "taskUUID"} for t in tasks]).encode("utf-8")
+        except (ValueError, TypeError, AttributeError):
+            logical = body
+        hx = sha256_bytes(logical)
+        fill = tuple(40 + int(hx[i:i + 2], 16) * 175 // 255 for i in (0, 2, 4))
+        im = Image.new("RGB", (w, h), fill)
         dr = ImageDraw.Draw(im)
+        bx, by = int(hx[6:8], 16) * max(1, w - w // 3) // 255, int(hx[8:10], 16) * max(1, h - h // 3) // 255
+        dr.rectangle([bx, by, bx + w // 3, by + h // 3], fill=tuple(255 - c for c in fill))
         dr.rectangle([8, 8, w - 9, h - 9], outline=(255, 255, 255), width=3)
         dr.text((20, 20), "OFFLINE FIXTURE - NOT LEARNED ART", fill=(255, 255, 255))
-        dr.text((20, 40), f"payload {sha256_bytes(body)[:16]}", fill=(255, 255, 255))
+        dr.text((20, 40), f"payload {hx[:16]}", fill=(255, 255, 255))
         buf = io.BytesIO()
         im.save(buf, format="PNG")
         return buf.getvalue()
