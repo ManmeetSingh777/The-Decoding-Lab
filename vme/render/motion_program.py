@@ -31,6 +31,7 @@ def _owner(decisions: list[dict], plan: dict, track: str, actor: str | None) -> 
     if choice is None:
         raise Blocked("MOTION_CHOICE_NOT_PLANNED", f"{cid}: the original scope does not declare this motion need")
     op = TRACK_OPS[track]
+    hits: list[tuple[dict, dict]] = []
     for d in decisions:
         if d.get("status") == "RESEARCH_ONLY" or not owns(d, cid, choice["dimensions"]):
             continue
@@ -40,8 +41,17 @@ def _owner(decisions: list[dict], plan: dict, track: str, actor: str | None) -> 
                 mp = b.get("motion_program") or {}
                 if mp.get("track_kind") != track or mp.get("method") not in METHODS:
                     raise Blocked("MOTION_PROGRAM_INVALID", f"{d['decision_id']}: {mp}")
-                return d, b
-    raise Blocked("MOTION_TRACK_UNOWNED", f"{track} for {actor or 'scene'}: no source-derived decision owns {cid} (no default motion)")
+                hits.append((d, b))
+    if not hits:
+        raise Blocked("MOTION_TRACK_UNOWNED", f"{track} for {actor or 'scene'}: no source-derived decision owns {cid} (no default motion)")
+    progs = {digest({k: v for k, v in h[1]["motion_program"].items() if k not in ("rationale", "witness_ids")}) for h in hits}
+    if len(progs) > 1:
+        # equally applicable owners prescribing different timing: never resolved by list order (R3 refusal discipline)
+        raise Blocked("CONFLICTING_MOTION_OWNERS", f"{track} for {actor or 'scene'}: " +
+                      ", ".join(f"{d['decision_id']}={b['motion_program'].get('method')}" for d, b in hits))
+    d, b = hits[0]
+    b = dict(b, co_owner_decision_ids=sorted({h[0]["decision_id"] for h in hits} - {d["decision_id"]}))
+    return d, b
 
 
 def _segment_keys(k0: dict, k1: dict, prop: str, mp: dict) -> list[dict]:
@@ -91,7 +101,7 @@ def compile_event_program(*, decisions: list[dict], scope, brief: dict, pack: di
         keys = [dict(k, x=k["x"] * scale) if "x" in k else dict(k) for k in a.get("keyframes", [])]
         if len(keys) > 1:
             d, b = _owner(decisions, plan, "ACTOR_ACTING", a["id"])
-            tracks.append({"kind": "ACTOR_ACTING", "actor_id": a["id"], "owner_decision_id": d["decision_id"], "branch_when": b["when"],
+            tracks.append({"kind": "ACTOR_ACTING", "actor_id": a["id"], "owner_decision_id": d["decision_id"], "co_owner_decision_ids": b["co_owner_decision_ids"], "branch_when": b["when"],
                            "method": b["motion_program"]["method"], "interpolation_or_redraw_method": b["motion_program"]["method"],
                            "start_frame": int(keys[0]["frame"]), "end_frame": min(n - 1, int(keys[-1]["frame"])),
                            "keyframes": _expand(keys, ("x", "y", "rotation", "scale"), b["motion_program"])})
@@ -110,7 +120,7 @@ def compile_event_program(*, decisions: list[dict], scope, brief: dict, pack: di
     cam = sp.get("camera") or []
     if len(cam) > 1:
         d, b = _owner(decisions, plan, "CAMERA", None)
-        tracks.append({"kind": "CAMERA", "owner_decision_id": d["decision_id"], "branch_when": b["when"], "method": b["motion_program"]["method"],
+        tracks.append({"kind": "CAMERA", "owner_decision_id": d["decision_id"], "co_owner_decision_ids": b["co_owner_decision_ids"], "branch_when": b["when"], "method": b["motion_program"]["method"],
                        "interpolation_or_redraw_method": b["motion_program"]["method"], "start_frame": int(cam[0]["frame"]),
                        "end_frame": min(n - 1, int(cam[-1]["frame"])), "keyframes": _expand(cam, ("x", "y", "scale"), b["motion_program"])})
     if sp.get("attention_beats"):
@@ -120,13 +130,13 @@ def compile_event_program(*, decisions: list[dict], scope, brief: dict, pack: di
             f = int(beat["frame"])
             keys += [{"frame": max(0, f - 1), "scale": 1.0}, {"frame": min(n - 1, f + 8), "scale": 1.0 + float(beat.get("emphasis", 0.04))},
                      {"frame": min(n - 1, f + 20), "scale": 1.0}]
-        tracks.append({"kind": "ATTENTION", "owner_decision_id": d["decision_id"], "branch_when": b["when"], "method": b["motion_program"]["method"],
+        tracks.append({"kind": "ATTENTION", "owner_decision_id": d["decision_id"], "co_owner_decision_ids": b["co_owner_decision_ids"], "branch_when": b["when"], "method": b["motion_program"]["method"],
                        "interpolation_or_redraw_method": b["motion_program"]["method"], "start_frame": keys[0]["frame"], "end_frame": keys[-1]["frame"],
                        "targets": [x.get("actor") for x in sp["attention_beats"]], "keyframes": _expand(keys, ("scale",), b["motion_program"])})
     if len(cam) > 1 and (scope.world or {}).get("layers"):
         d, b = _owner(decisions, plan, "WORLD", None)
         keys = [{"frame": int(k["frame"]), "x": -0.5 * float(k.get("x", 0))} for k in cam]
-        tracks.append({"kind": "WORLD", "owner_decision_id": d["decision_id"], "branch_when": b["when"], "method": b["motion_program"]["method"],
+        tracks.append({"kind": "WORLD", "owner_decision_id": d["decision_id"], "co_owner_decision_ids": b["co_owner_decision_ids"], "branch_when": b["when"], "method": b["motion_program"]["method"],
                        "interpolation_or_redraw_method": b["motion_program"]["method"], "start_frame": keys[0]["frame"], "end_frame": keys[-1]["frame"],
                        "parallax_factor": 0.5, "keyframes": _expand(keys, ("x",), b["motion_program"])})
     cues = []
@@ -137,7 +147,7 @@ def compile_event_program(*, decisions: list[dict], scope, brief: dict, pack: di
         for c in sp["audio"].get("cues", []):
             cues.append({"frame": int(c["frame"]), "event_id": c.get("event_id"), "kind": c.get("kind", "DIRECTED_CUE")})
         cues = sorted({c["frame"]: c for c in cues}.values(), key=lambda c: c["frame"])
-        tracks.append({"kind": "AUDIO", "owner_decision_id": d["decision_id"], "branch_when": b["when"], "method": b["motion_program"]["method"],
+        tracks.append({"kind": "AUDIO", "owner_decision_id": d["decision_id"], "co_owner_decision_ids": b["co_owner_decision_ids"], "branch_when": b["when"], "method": b["motion_program"]["method"],
                        "interpolation_or_redraw_method": b["motion_program"]["method"], "start_frame": cues[0]["frame"] if cues else 0,
                        "end_frame": cues[-1]["frame"] if cues else 0, "cues": cues})
     for t in tracks:

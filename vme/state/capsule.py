@@ -190,12 +190,28 @@ def pinned_rehearsal(ws: Workspace, st, skill_folder: str, skill_hash: str) -> d
         return None
     brief = st.get("OriginalBrief", a["brief_id"])["brief"]
     from ..skills.skill import load_skill
-    nodes = [n["id"] for n in load_skill(skill_folder)["recipes"]["main"]["nodes"] if n["id"] in ("n_world_plate", "n_whole_scene")]
+    have = {n["id"] for n in load_skill(skill_folder)["recipes"]["main"]["nodes"]}
+    # prefer the whole-scene job: it carries the source references, so a restore that lost reference bytes is caught
+    # (the world plate is setting-only and reference-free; it is the fallback, never the preferred proof)
+    nodes = [n for n in ("n_whole_scene", "n_world_plate") if n in have]
     if not nodes:
         return None
     job = StyleProgramCompiler().compile(brief, skill_folder, pinned_skill_hash=skill_hash, recipe_id="main", node_id=nodes[0], caps=snap)
+    # R3 F12 / acceptance §E: every actor's own canonical job must also replay identically after a cold restore
+    from ..loop.real import RealLoopRunner
+    actors = [x for x in (brief.get("scope") or {}).get("subjects", []) if x.get("kind") == "character"]
+    per_actor = {}
+    if any(n["id"] == "n_canonical_character" for n in load_skill(skill_folder)["recipes"]["main"]["nodes"]):
+        for x in actors:
+            b = dict(brief, slots={**brief["slots"], **RealLoopRunner._actor_slots(brief, x)})
+            scope = {"actor_id": x["id"], "other_actor_ids": [y["id"] for y in actors if y["id"] != x["id"]]} if len(actors) > 1 else None
+            # never swallowed: a missing reference byte / changed decision must surface as the exact Blocked code
+            j = StyleProgramCompiler().compile(b, skill_folder, pinned_skill_hash=skill_hash, recipe_id="main",
+                                               node_id="n_canonical_character", caps=snap, actor_scope=scope)
+            per_actor[x["id"]] = {"logical_sha256": j.logical_sha256, "job_id": j.job_id, "reference_shas": [r[1] for r in j.reference_images]}
+    refs = [r[1] for r in job.reference_images] + [s for x in actors if x["id"] in per_actor for s in per_actor[x["id"]]["reference_shas"]]
     return {"node": nodes[0], "skill_hash": skill_hash, "logical_sha256": job.logical_sha256,
-            "reference_shas": [r[1] for r in job.reference_images], "brief_id": a["brief_id"]}
+            "reference_shas": refs, "brief_id": a["brief_id"], "actors": per_actor}
 
 
 def validate_capsule(cap: dict) -> list[str]:
@@ -265,7 +281,8 @@ def import_and_verify(zip_path: str | Path, new_root: str | Path, *, sources_fol
         same = False
         if rehearsal is not None:
             same = rehearsal["logical_sha256"] == cap["pinned_rehearsal"]["logical_sha256"] \
-                and rehearsal["reference_shas"] == cap["pinned_rehearsal"]["reference_shas"]
+                and rehearsal["reference_shas"] == cap["pinned_rehearsal"]["reference_shas"] \
+                and rehearsal.get("actors", {}) == cap["pinned_rehearsal"].get("actors", {})
         decs = [d for d in st.list("ConditionalVisualDecision") if not d.get("synthetic")]
         recon = {"observed": sorted({r for d in decs for r in d.get("observed_vs_inferred", {}).get("observed", []) if r})[:20],
                  "inferred": [d.get("observed_vs_inferred", {}).get("inferred_mechanism") for d in decs][:20],

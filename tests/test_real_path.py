@@ -111,9 +111,11 @@ def test_states_are_conditioned_on_approved_canonical_bytes(drill):
     st = ws.store()
     s5 = st.get("LoopTransition", "REAL-DRILL:S5")["outputs"]
     pack = read_json(st.get("LoopTransition", "REAL-DRILL:S7")["outputs"]["pack"])
-    assert pack["method"] == "WHOLE_STATE_SWAP" and set(pack["states"]) == {"view:front", "grip:chamber_handle"}
+    # R3 F12: states are keyed per actor (`actor:state`) and bound to THAT actor's canonical bytes
+    assert pack["method"] == "WHOLE_STATE_SWAP" and set(pack["states"]) == {"explorer:view:front", "explorer:grip:chamber_handle"}
     for v in pack["states"].values():
         assert s5["n_canonical_character"]["sha"] in v["reference_shas"]
+        assert v["actor_id"] == "explorer" and v["identity_source_sha256"] == s5["n_canonical_character@explorer"]["sha"]
     s8 = st.get("LoopTransition", "REAL-DRILL:S8")["outputs"]
     assert s8["motion"] == "INDEPENDENT_MOTION_PRESENT" and s8["state_swaps"] == 2
     st.close()

@@ -1273,7 +1273,9 @@ class RealLoopRunner:
         for a in actors:
             over = self._actor_slots(brief, a)
             r = execute(s4["skill_folder"], brief, gateway=g, caps=snap, node_ids=["n_canonical_character"], pinned_skill_hash=s4["skill_hash"],
-                        slot_overrides={"n_canonical_character": over}, store=st)["n_canonical_character"]
+                        slot_overrides={"n_canonical_character": over}, store=st,
+                        actor_scope={"actor_id": a["id"], "other_actor_ids": [x["id"] for x in actors if x["id"] != a["id"]]}
+                        if len(actors) > 1 else None)["n_canonical_character"]
             res[f"n_canonical_character@{a['id']}"] = {**r, "actor_id": a["id"], "identity_slots": over}
         shas = [res[f"n_canonical_character@{a['id']}"]["sha"] for a in actors]
         if len(set(shas)) != len(shas):

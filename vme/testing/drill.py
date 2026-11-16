@@ -48,6 +48,58 @@ def drill_brief(brief_id: str = "BRIEF-DRILL-ANCHOR", subject: str = "deep-sea r
     return b
 
 
+def two_actor_brief(brief_id: str = "BRIEF-CANARY-2ACTOR", audio: dict | None = None) -> dict:
+    """R3 offline canary: a NOVEL original two-actor scene — distinct identities, a hand/prop contact, overlapping actions, view change,
+    camera + attention beats, world layers and an audio cue. Content only (the brief never carries style)."""
+    audio = audio if audio is not None else DRILL_SOUND
+    b = {"brief_id": brief_id, "shot_id": "canary-shot-1",
+         "subjects": [{"id": "keeper", "noun": "lighthouse keeper with a brass lantern", "subject_kind": "biped", "role": "focal", "content_attributes": []},
+                      {"id": "moth", "noun": "giant friendly moth", "subject_kind": "creature", "role": "secondary", "content_attributes": []}],
+         "actions": ["the keeper lifts the lantern while the moth circles and turns toward the light"],
+         "world": {"setting": "storm-lit lighthouse gallery", "environment": "coast"}, "visual_focus": "keeper, lantern and moth",
+         "camera_or_view_requirement": "three_quarter then front", "novelty_constraints": ["no source characters or logos"],
+         "animation_requirements": ["grip", "view change", "simultaneous action"], "content_provenance": "FIXTURE_CANARY",
+         "slots": {"subject": "lighthouse keeper with a brass lantern", "setting": "storm-lit lighthouse gallery", "action": "lifts a lantern toward a moth",
+                   "visual_role": "focal", "view": "three_quarter", "subject_kind": "biped", "environment": "coast", "original_prop": "brass lantern handle"},
+         "scope": {"subjects": [{"id": "keeper", "kind": "character", "subject_kind": "biped", "role": "focal", "view": "three_quarter",
+                                 "face_visible": True, "contact_props": ["lantern_handle"], "lighting_changes": False, "actions": ["lifts the lantern"]},
+                                {"id": "moth", "kind": "character", "subject_kind": "creature", "role": "secondary", "view": "three_quarter",
+                                 "view_changes": ["front"], "face_visible": True, "lighting_changes": False, "actions": ["circles", "turns toward the light"]}],
+                   "world": {"kind": "coast", "layers": True, "lighting": "directional"},
+                   "camera": {"moves": True, "attention_beats": True}, "audio_cues": [{"event_id": "k1"}],
+                   "events": [{"event_id": "k1", "actors": ["keeper", "moth"]}]},
+         "shot_plan": {"actions": [{"actor": "keeper", "event_id": "k1", "contact_prop": "lantern_handle", "hand_side": "right"},
+                                   {"actor": "moth", "event_id": "m1", "view": "front"}],
+                       "events": [{"event_id": "k1", "actor": "keeper", "from": 15, "to": 59, "state": "grip:lantern_handle"},
+                                  {"event_id": "m1", "actor": "moth", "from": 25, "to": 59, "state": "view:front"}],
+                       "plan_width": 1280,
+                       "actors": [{"id": "keeper", "x": 200, "y": 180, "w": 480, "h": 480, "z": 2,
+                                   "keyframes": [{"frame": 0, "x": 200}, {"frame": 59, "x": 260}], "directed_by": "CANARY brief author (fixture)"},
+                                  {"id": "moth", "x": 820, "y": 80, "w": 320, "h": 320, "z": 3,
+                                   "keyframes": [{"frame": 0, "x": 900, "y": 60}, {"frame": 30, "x": 760, "y": 140}, {"frame": 59, "x": 700, "y": 100}],
+                                   "directed_by": "CANARY brief author (fixture)"}],
+                       "camera": [{"frame": 0, "x": 0, "y": 0, "scale": 1.0}, {"frame": 59, "x": 30, "y": 0, "scale": 1.06}],
+                       "attention_beats": [{"frame": 15, "actor": "keeper", "emphasis": 0.03}, {"frame": 25, "actor": "moth", "emphasis": 0.04}],
+                       "fps": 30, "frames": 60}}
+    if audio:
+        b["shot_plan"]["audio"] = {"required": True, "approved_asset_sha256": audio["sha256"], "asset_path": audio["path"],
+                                   "cues": [{"frame": 5, "kind": "DIRECTED_CUE"}]}
+    return b
+
+
+def two_actor_unseen_brief(n: int = 0) -> dict:
+    """Held-out canary content inside the learned condition scope (same subject kinds / roles / environment), new nouns + action."""
+    b = two_actor_brief(brief_id=f"BRIEF-CANARY-UNSEEN-{n}")
+    b["subjects"][0]["noun"] = "harbor pilot with a signal lamp"
+    b["subjects"][1]["noun"] = "giant friendly beetle"
+    b["actions"] = ["the pilot raises the signal lamp while the beetle lands on the rail and turns toward the light"]
+    b["slots"].update(subject="harbor pilot with a signal lamp", setting="foggy harbor pier", action="raises a signal lamp toward a beetle",
+                      original_prop="signal lamp handle")
+    b["world"]["setting"] = "foggy harbor pier"
+    b["shot_id"] = f"canary-unseen-{n}"
+    return b
+
+
 def build_drill_workspace(root: Path) -> dict:
     from ..fixtures.synthetic import make_clip, make_sixth_clip
     from ..reference.ingest import ingest, index_all
@@ -125,7 +177,8 @@ def enable_network_flag():
     os.environ["VME_ALLOW_NETWORK"] = "1"   # simulated transports only; no socket is opened by these adapters
 
 
-def drive(ws: Workspace, providers, *, run_id: str = "REAL-DRILL", crash_at: list[str] | None = None, max_rounds: int = 40) -> dict:
+def drive(ws: Workspace, providers, *, run_id: str = "REAL-DRILL", crash_at: list[str] | None = None, max_rounds: int = 40,
+          families: list[str] | None = None, anchor_brief_id: str = "BRIEF-DRILL-ANCHOR", unseen_brief=None) -> dict:
     """Run the REAL loop, acting as the (fixture) human whenever it stops for a human decision.
     crash_at: stages after whose commit an in-process crash is injected once each (resume must continue)."""
     from ..loop.real import RealLoopRunner
@@ -161,12 +214,12 @@ def drive(ws: Workspace, providers, *, run_id: str = "REAL-DRILL", crash_at: lis
                 st = ws.store()
             elif reason == "AWAITING_ARTWORK_REVIEW":
                 imgs = (st.get("LoopTransition", f"{run_id}:S6") or {})["outputs"]["images"]
-                GateKeeper(st).submit_art_verdict(run_id, image_paths=imgs, brief_id="BRIEF-DRILL-ANCHOR", skill_versions=[], verdict="APPROVED",
+                GateKeeper(st).submit_art_verdict(run_id, image_paths=imgs, brief_id=anchor_brief_id, skill_versions=[], verdict="APPROVED",
                                                   defects=[], signed_by=DRILL_HUMAN)
             elif reason == "AWAITING_ASSET_REVIEW":
                 s7 = (st.get("LoopTransition", f"{run_id}:S7") or {})["outputs"]
                 GateKeeper(st).submit_asset_verdict(run_id, pack_manifest={"files": s7["files"]}, verdict="APPROVED", signed_by=DRILL_HUMAN,
-                                                    character_family_ids=["explorer"])
+                                                    character_family_ids=list(families or ["explorer"]))
             elif reason == "AWAITING_VIDEO_REVIEW":
                 save_user_review(st, run_id=run_id, verdict="PARTIAL", top_remaining_gaps=["grip hand does not overlap the handle"],
                                  preferred_next_focus="grip", submitted_by=DRILL_HUMAN, linked_image_hashes=[], stage="video",
@@ -178,7 +231,8 @@ def drive(ws: Workspace, providers, *, run_id: str = "REAL-DRILL", crash_at: lis
                 st = ws.store()
             elif reason == "AWAITING_UNSEEN_BRIEF":
                 st.close()
-                add_brief(ws, drill_brief(brief_id=f"BRIEF-DRILL-UNSEEN-{len(log)}", subject="tidal survey diver"), added_by=DRILL_HUMAN, holdout=True)
+                nb = unseen_brief(len(log)) if unseen_brief else drill_brief(brief_id=f"BRIEF-DRILL-UNSEEN-{len(log)}", subject="tidal survey diver")
+                add_brief(ws, nb, added_by=DRILL_HUMAN, holdout=True)
                 st = ws.store()
             else:
                 return {"result": out, "log": log}

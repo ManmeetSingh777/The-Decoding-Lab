@@ -515,6 +515,42 @@ def test_f13_motion_is_owned_by_source_decisions_and_ablation_changes_or_blocks_
     assert all(t["interpolation_or_redraw_method"] not in (None, "DEFAULT_LINEAR", "WHOLE_STATE_SWAP_ONLY") for t in p["tracks"])
 
 
+@pytest.mark.req("R3-F14", "R3-F04")
+def test_f14_audio_witness_is_evidence_only_with_its_aligned_full_frame_parent():
+    """S2 blocker fix: the audio observer is registered, but only for AUDIO_SIGNAL with a same-film full frame within ±1 frame."""
+    from vme.investigation.evidence import Witness, WitnessBundle, validate_bundle
+    rel_f = "the frame stays unchanged relative to the previous frame while the lamp remains lit"
+    rel_a = "an audio energy onset occurs while the frame stays unchanged relative to the previous frame"
+    full = lambda wid, film=FA, f=10: Witness(wid, film, "seq", f, f, "FULL_FRAME", "VLM", rel_f)
+    aud = lambda parent, observer="LOCAL_SIGNAL_ANALYSIS": Witness("A1", FA, "seq", 10, 10, "AUDIO_SIGNAL", observer, rel_a,
+                                                                   parent_full_frame_witness=parent)
+    ok = lambda *ws: validate_bundle(WitnessBundle("b", None, "x", list(ws)))
+    assert ok(full("F1"), aud("F1"))["ok"]
+    assert any(p.startswith("AUDIO_WITHOUT_FULL_FRAME_CONTEXT") for p in ok(full("F1"), aud(None))["problems"])
+    assert any(p.startswith("AUDIO_WITHOUT_FULL_FRAME_CONTEXT") for p in ok(full("F1"), aud("F-missing"))["problems"])
+    assert any(p.startswith("AUDIO_PARENT_MISALIGNED") for p in ok(full("F2", f=14), aud("F2"))["problems"])
+    assert any(p.startswith("AUDIO_PARENT_MISALIGNED") for p in ok(full("F3", film=FB), aud("F3"))["problems"])
+    assert any(p.startswith("AUDIO_SIGNAL_WRONG_OBSERVER") for p in ok(full("F1"), aud("F1", observer="VLM"))["problems"])
+    vis = Witness("V1", FA, "seq", 10, 10, "FULL_FRAME", "LOCAL_SIGNAL_ANALYSIS", rel_f)
+    assert any(p.startswith("LOCAL_SIGNAL_OBSERVER_ON_VISUAL_EVIDENCE") for p in ok(vis)["problems"])
+
+
+@pytest.mark.req("R3-F13", "R3-F05")
+def test_f13_conflicting_motion_owners_refuse_and_agreeing_owners_corroborate():
+    import copy
+    from vme.render.motion_program import compile_event_program
+    decs, scope, brief = _motion_fixture()
+    twin = copy.deepcopy(next(d for d in decs if d["decision_id"] == "PC-act"))
+    twin["decision_id"] = "PC-act2"
+    p = compile_event_program(decisions=decs + [twin], scope=scope, brief=brief, pack={"states": {}}, width=100, height=100, scale=1.0)
+    t = next(t for t in p["tracks"] if t["kind"] == "ACTOR_ACTING")
+    assert t["owner_decision_id"] == "PC-act" and t["co_owner_decision_ids"] == ["PC-act2"]
+    twin["branches"][0]["motion_program"]["method"] = "HOLD_THEN_MOVE"
+    with pytest.raises(Blocked) as e:                     # list order must never decide between disagreeing source decisions
+        compile_event_program(decisions=decs + [twin], scope=scope, brief=brief, pack={"states": {}}, width=100, height=100, scale=1.0)
+    assert e.value.code == "CONFLICTING_MOTION_OWNERS" and "PC-act2=HOLD_THEN_MOVE" in e.value.detail
+
+
 @pytest.mark.req("R3-F13")
 def test_f13_camera_only_motion_cannot_stand_in_for_actor_acting():
     from vme.render.motion_program import compile_event_program

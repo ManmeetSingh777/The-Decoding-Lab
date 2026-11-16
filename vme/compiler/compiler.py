@@ -127,7 +127,8 @@ class StyleProgramCompiler:
         return out
 
     def compile(self, raw_brief: dict, skill_folder: str | Path, *, pinned_skill_hash: str, recipe_id: str, node_id: str,
-                caps: dict, identity_assets: dict | None = None, output_contract: dict | None = None) -> CompiledImageJob:
+                caps: dict, identity_assets: dict | None = None, output_contract: dict | None = None,
+                actor_scope: dict | None = None) -> CompiledImageJob:
         brief = validate_brief(raw_brief)
         skill = load_skill(skill_folder)
         if skill["skill_hash"] != pinned_skill_hash:
@@ -175,6 +176,20 @@ class StyleProgramCompiler:
         if not req:
             raise research_ticket("MISSING_STYLE_DECISION", missing_decision=None, affected_state=node_id,
                                   question="recipe node lists no style decisions", reason="EMPTY_STYLE_PROGRAM")
+        other_actor_decisions: list[str] = []
+        if actor_scope:
+            me, others = actor_scope.get("actor_id"), set(actor_scope.get("other_actor_ids") or [])
+            if not me or me in others:
+                raise Blocked("ACTOR_SCOPE_INVALID", str(actor_scope))
+
+            def _only_others(d):
+                owned = [str(x) for x in (d or {}).get("owned_choice_ids") or []]
+                return bool(owned) and all(x.split(":", 1)[0] in others for x in owned)
+            other_actor_decisions = sorted(did for did in req if _only_others(decisions.get(did)))
+            req = [did for did in req if did not in other_actor_decisions]
+            if not req:
+                raise research_ticket("MISSING_STYLE_DECISION", missing_decision=None, affected_state=f"{node_id}@{me}",
+                                      question=f"no decision owns any choice of actor {me}", reason="ACTOR_UNOWNED")
         for did in sorted(req):
             resolve(did)
         clause_by_id = {c["id"]: c for c in skill["clauses"]}
@@ -358,7 +373,8 @@ class StyleProgramCompiler:
         trace = {"compiler_version": COMPILER_VERSION, "brief_id": brief.brief_id, "brief_hash": brief_hash(brief),
                  "skill_id": skill["skill_id"], "skill_version": skill["version"], "skill_hash": skill["skill_hash"],
                  "skill_status": skill["status"], "recipe_id": recipe_id, "node_id": node_id, "operator": node["operator"],
-                 "selected_decisions": sorted(selected),
+                 "selected_decisions": sorted(selected), "actor_scope": actor_scope,
+                 "excluded_other_actor_decisions": other_actor_decisions,
                  "selected_branches": {did: selected[did]["branch"]["when"] for did in sorted(selected)},
                  "clause_ids": [s["clause_id"] for s in segs if s["authority"] == "STYLE"], "segments": segs,
                  "reference_trace": ref_trace, "optional_references_omitted": omitted, "stages": stages, "negative_trace": neg_trace, "field_ownership": ownership,
@@ -373,9 +389,11 @@ class StyleProgramCompiler:
         inputs = {"brief": raw_brief, "skill_folder": str(skill_folder), "pinned_skill_hash": pinned_skill_hash,
                   "recipe_id": recipe_id, "node_id": node_id, "caps": caps,
                   "identity_assets": {k: {kk: vv for kk, vv in v.items()} for k, v in identity_assets.items()},
-                  "output_contract": output_contract}
+                  "output_contract": output_contract, "actor_scope": actor_scope}
         logical = {"payload": payload, "refs": [(r[0], r[1]) for r in refs_stage1], "trace_core": {
             k: trace[k] for k in ("brief_hash", "skill_hash", "selected_decisions", "clause_ids", "node_id", "caps_sha")}}
+        if actor_scope:
+            logical["actor_scope"] = actor_scope         # only per-actor jobs carry it, so single-actor job ids are unchanged
         lsha = digest(logical)
         trace["style_authority_report"]["job_id"] = f"job_{lsha[:20]}"
         return CompiledImageJob(f"job_{lsha[:20]}", payload, tuple(refs_stage1), trace, inputs,
@@ -406,7 +424,8 @@ def recompile(job: CompiledImageJob) -> CompiledImageJob:
     if i.get("baseline"):
         return c.compile_baseline(i["brief"], caps=i["caps"], output_contract=i["output_contract"])
     return c.compile(i["brief"], i["skill_folder"], pinned_skill_hash=i["pinned_skill_hash"], recipe_id=i["recipe_id"],
-                     node_id=i["node_id"], caps=i["caps"], identity_assets=i["identity_assets"], output_contract=i["output_contract"])
+                     node_id=i["node_id"], caps=i["caps"], identity_assets=i["identity_assets"], output_contract=i["output_contract"],
+                     actor_scope=i.get("actor_scope"))
 
 
 def payload_diff(a: dict, b: dict) -> dict:

@@ -12,7 +12,9 @@ from ..skills.skill import load_skill
 
 def execute(skill_folder: str | Path, brief: dict, *, gateway, caps: dict, node_ids: list[str], pinned_skill_hash: str,
             recipe_id: str = "main", identity_assets: dict | None = None, slot_overrides: dict | None = None,
-            store=None, task_category: str = "image_generation") -> dict:
+            store=None, task_category: str = "image_generation", actor_scope: dict | None = None) -> dict:
+    """actor_scope = {"actor_id": X, "other_actor_ids": [...]}: a per-actor job (R3 F12). Decisions owned ONLY by other actors'
+    choices are not this actor's; every decision owning one of X's choices (or a shared camera/world choice) stays required."""
     sk = load_skill(skill_folder)
     if sk["skill_hash"] != pinned_skill_hash:
         from ..util import Blocked
@@ -24,7 +26,7 @@ def execute(skill_folder: str | Path, brief: dict, *, gateway, caps: dict, node_
         if slot_overrides and nid in slot_overrides:
             b["slots"] = {**brief["slots"], **slot_overrides[nid]}
         job = c.compile(b, skill_folder, pinned_skill_hash=pinned_skill_hash, recipe_id=recipe_id, node_id=nid, caps=caps,
-                        identity_assets=identity_assets)
+                        identity_assets=identity_assets, actor_scope=actor_scope)
         if store is not None:
             store.put("CompiledImageJob", job.job_id, {"job_id": job.job_id, "node_id": nid,
                                                        "payload": {k: v for k, v in job.logical_payload.items() if k != "inputs"},
