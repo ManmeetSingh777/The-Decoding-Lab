@@ -1,0 +1,572 @@
+{
+ "exitstatus": 0,
+ "results": [
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_all_vision_custom_ids_are_short_safe_and_stable",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R01",
+    "ST28-24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.019,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_strict_fake_batches_reject_invalid_custom_id_and_params",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R01",
+    "R03"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.006,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_adapter_refuses_invalid_custom_id_before_any_create",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R01"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.027,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_accept_then_raise_is_submission_uncertain_never_resubmitted",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R02",
+    "R07",
+    "ST28-24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.128,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_hard_kill_after_create_before_batch_id_saved_is_uncertain",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R02",
+    "R24",
+    "ST28-17"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.989,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_crash_after_intent_before_create_is_uncertain_not_resent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R02"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.151,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_bad_batch_results_are_named_and_raw_is_kept[truncated-PROVIDER_OUTPUT_TRUNCATED]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R02",
+    "ST28-01"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.083,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_bad_batch_results_are_named_and_raw_is_kept[non_json-PROVIDER_NON_JSON]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R02",
+    "ST28-01"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.1,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_bad_batch_results_are_named_and_raw_is_kept[errored-PROVIDER_EXECUTION]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R02",
+    "ST28-01"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.072,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_bad_batch_results_are_named_and_raw_is_kept[expired-PROVIDER_EXECUTION]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R02",
+    "ST28-01"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.082,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_runware_body_is_uuid4_with_documented_fields",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R04",
+    "R05",
+    "ST28-24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.147,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_strict_runware_fake_rejects_uuid5_and_missing_include_cost",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R04"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.003,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_uuid4_persisted_before_network_and_reused_after_crash",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R04",
+    "R06",
+    "ST28-17"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.086,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_accept_then_drop_reconciles_by_get_response_without_resend",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R06",
+    "R07"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.104,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_possible_acceptance_not_found_is_unknown_billing_then_human_reconcile",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R06",
+    "R07",
+    "ST28-24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.159,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_processing_status_is_pending_not_resent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R06"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.137,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_url_and_data_uri_results_are_decoded_and_verified[url_only-URL]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R05"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.114,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_url_and_data_uri_results_are_decoded_and_verified[data_uri-dataURI]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R05"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.112,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_url_fetch_refuses_unapproved_host_and_plain_http",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R05"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_concurrent_reservations_cannot_overrun_cap",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R07",
+    "ST28-24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.203,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_process_level_concurrent_gateway_jobs_respect_cap",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R07"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.979,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_unreserved_spend_api_is_gone",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R07"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_anthropic_sdk_pinned_and_request_serializes",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R03"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 5.173,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_crash_after_response_saved_before_settle_neither_loses_cost_nor_replays",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R07",
+    "ST28-24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.133,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_provider_contracts.py::test_strict_runware_fake_rejects_every_contract_violation_without_billing",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R04",
+    "R05",
+    "ST28-24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.077,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_every_span_owned_content_or_skill",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A33",
+    "A54",
+    "C15",
+    "C16"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.011,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_changing_selected_decision_changes_payload",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A36",
+    "B17",
+    "C29",
+    "ADD25-P03",
+    "ADD26-P02"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.072,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_changing_nonselected_prose_does_not_change_payload",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B18",
+    "ADD25-P04"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.069,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_removing_required_decision_blocks_with_ticket",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-P02",
+    "A54",
+    "B15"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.071,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_runtime_style_append_and_raw_prompt_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A53",
+    "ADD25-P01",
+    "ADD26-P01",
+    "C14",
+    "B19"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.022,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_static_scan_only_compiler_builds_positive_prompt_and_only_gateway_sends",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C14",
+    "ADD26-A01",
+    "R24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.466,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_static_scanner_still_catches_an_unauthorized_send",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "R24"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_style_smuggled_through_brief_rejected_with_ticket",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-P05",
+    "A56",
+    "B20",
+    "ADD27-9"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.012,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_pose_edit_without_identity_reference_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B21",
+    "A57",
+    "A59"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.014,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_stage_specific_operations_and_identity_bytes_sent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A55",
+    "A57",
+    "A59"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.044,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_reference_overflow_staged_or_blocked",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B22",
+    "ADD25-P06",
+    "A35"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.162,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_prompt_length_and_dimension_limits",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A35"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.024,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_skill_md_only_has_no_authority",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B16",
+    "C13"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.002,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_compiler_bug_dropping_clause_is_caught_with_before_after_bytes",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A34",
+    "ADD27-8"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.011,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_unlike_subject_selects_different_branch_same_grammar",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C15",
+    "ADD26-P03",
+    "A51"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.022,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_deterministic_logical_request",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C16",
+    "A37"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.031,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_unpinned_or_modified_frozen_skill_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A33"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.044,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_reference_impl_suites_pass",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A68"
+   ],
+   "phase": "OFFLINE",
+   "path": "ENGINEERING",
+   "duration_s": 0.373,
+   "longrepr": null
+  }
+ ]
+}

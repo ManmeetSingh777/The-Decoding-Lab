@@ -1,0 +1,25 @@
+{
+  "complete_frame_index": true,
+  "distinct_durations": [
+    256
+  ],
+  "duplicate_pts": [],
+  "end_gap_s": -0.0,
+  "film_sha256": "a3e410bad3a59219c93e222b1c6cb8f2a5b86fe7eed019a2fb9ccec1b4aaac49",
+  "first_pts": 256,
+  "frame_count_decoded": 43064,
+  "index_path": "workspace\\frames\\a3e410bad3a59219c93e222b1c6cb8f2a5b86fe7eed019a2fb9ccec1b4aaac49\\index.jsonl.gz",
+  "index_sha256": "123402cd67c7c65680561d025ef5d2a36c2cc184000336b4e44e7cc1cabb9659",
+  "indexed_at": "2026-11-14T22:04:59+00:00",
+  "last_frame_end_s": 717.75,
+  "last_pts": 11024384,
+  "metadata_count_mismatch": false,
+  "metadata_nb_frames": null,
+  "problems": [],
+  "pts_discontinuities": [],
+  "pts_monotonic": true,
+  "stream_duration_s": 717.733333,
+  "time_base": "1/15360",
+  "vfr_observed": false,
+  "video_path": "..\\source_clips\\You're More Stressed Than Ever - Let's Change That.mp4"
+}

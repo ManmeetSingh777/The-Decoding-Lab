@@ -1,0 +1,59 @@
+{
+  "created_at": "2026-11-14T22:33:23+00:00",
+  "film_sha256": "2a54f0de183cd99bb0d049d63f256806b216113e3e6fbcf081d998d7062abcb5",
+  "method": "ffmpeg_scene_score_navigation",
+  "navigation_thumbnails": [],
+  "shots": [
+    {
+      "boundary_confidence": "CANDIDATE_NOT_GROUND_TRUTH",
+      "content_label": "UNKNOWN_REQUIRES_VISUAL_REVIEW",
+      "end_frame_index_inclusive": 450,
+      "end_pts_time": 15.033333333333333,
+      "entry_change_score": 1.0,
+      "frame_count": 451,
+      "shot_id": "shot_0000",
+      "start_frame_index": 0,
+      "start_pts_time": 0.03333333333333333
+    },
+    {
+      "boundary_confidence": "CANDIDATE_NOT_GROUND_TRUTH",
+      "content_label": "UNKNOWN_REQUIRES_VISUAL_REVIEW",
+      "end_frame_index_inclusive": 451,
+      "end_pts_time": 15.066666666666666,
+      "entry_change_score": 0.3773,
+      "frame_count": 1,
+      "shot_id": "shot_0001",
+      "start_frame_index": 451,
+      "start_pts_time": 15.066666666666666
+    },
+    {
+      "boundary_confidence": "CANDIDATE_NOT_GROUND_TRUTH",
+      "content_label": "UNKNOWN_REQUIRES_VISUAL_REVIEW",
+      "end_frame_index_inclusive": 4245,
+      "end_pts_time": 141.53333333333333,
+      "entry_change_score": 0.39,
+      "frame_count": 3794,
+      "shot_id": "shot_0002",
+      "start_frame_index": 452,
+      "start_pts_time": 15.1
+    },
+    {
+      "boundary_confidence": "CANDIDATE_NOT_GROUND_TRUTH",
+      "content_label": "UNKNOWN_REQUIRES_VISUAL_REVIEW",
+      "end_frame_index_inclusive": 12219,
+      "end_pts_time": 407.3333333333333,
+      "entry_change_score": 0.6839,
+      "frame_count": 7974,
+      "shot_id": "shot_0003",
+      "start_frame_index": 4246,
+      "start_pts_time": 141.56666666666666
+    }
+  ],
+  "status": "SURVEY_ONLY_NOT_VISION",
+  "threshold": 0.3,
+  "uncertainty": [
+    "Shot boundaries are candidates; gradual dissolves/zooms may be missed or over-split.",
+    "No content labels (main/credits/sponsor) without visual review.",
+    "This survey never counts as VLM_SEEN or PER_FRAME_ART_OBSERVED."
+  ]
+}

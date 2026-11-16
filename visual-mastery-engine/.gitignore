@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+workspace/
+reports/
+audit_build/
+render/remotion/node_modules/
+render/remotion/public/
+*.log
+.env
+evidence_reuse/
+audit_build_v3/

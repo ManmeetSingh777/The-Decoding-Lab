@@ -1,0 +1,512 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vme/addendum27/coverage_provenance.schema.json",
+  "title": "VME Addendum 27 typed records (additive)",
+  "$defs": {
+    "EvidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_hash",
+        "sequence_id",
+        "frame_start",
+        "frame_end",
+        "evidence_kind"
+      ],
+      "properties": {
+        "source_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame_start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frame_end": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_kind": {
+          "enum": [
+            "FULL_FRAME",
+            "NATIVE_CROP",
+            "TEMPORAL_COMPARE",
+            "CROSS_SEQUENCE",
+            "ORIGINAL_OUTPUT",
+            "SYNTHETIC_FIXTURE"
+          ]
+        },
+        "region": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "DimensionCoverageEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension",
+        "status",
+        "evidence",
+        "why_relevant",
+        "missing_decisions",
+        "production_consumers",
+        "connected_dimensions"
+      ],
+      "properties": {
+        "dimension": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "RELEVANT_SUPPORTED",
+            "RELEVANT_UNKNOWN",
+            "NOT_VISIBLE",
+            "NOT_APPLICABLE_WITH_REASON",
+            "PENDING_SOURCE",
+            "CONTRADICTED"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          }
+        },
+        "why_relevant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missing_decisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "production_consumers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "connected_dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "inapplicability_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "RelationCoverageEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation_id",
+        "participants",
+        "evidence",
+        "status",
+        "producing_effect",
+        "missing_decisions"
+      ],
+      "properties": {
+        "relation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          }
+        },
+        "status": {
+          "enum": [
+            "SUPPORTED",
+            "UNKNOWN",
+            "CONTRADICTED",
+            "NOT_APPLICABLE_WITH_REASON"
+          ]
+        },
+        "producing_effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missing_decisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "ProvenanceNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_id",
+        "node_type",
+        "origin_type",
+        "content",
+        "parent_ids",
+        "status"
+      ],
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_type": {
+          "enum": [
+            "SOURCE_WITNESS",
+            "SOURCE_OBSERVATION",
+            "STYLE_INFERENCE",
+            "STYLE_DECISION",
+            "SKILL_CLAUSE",
+            "REFERENCE_IMAGE",
+            "OPERATION",
+            "COMPILED_FIELD",
+            "PROVIDER_RESULT",
+            "ASSET",
+            "RENDERED_FRAME_REGION",
+            "ORIGINAL_BRIEF"
+          ]
+        },
+        "origin_type": {
+          "enum": [
+            "SOURCE_OBSERVED",
+            "CROSS_SOURCE_INFERRED",
+            "PRODUCER_ENGINEERING_CHOICE",
+            "ORIGINAL_BRIEF_CONTENT",
+            "APPROVED_STYLE_REVISION",
+            "MODEL_SUGGESTED_UNVERIFIED",
+            "PROVIDER_GENERATED_UNDETERMINED",
+            "UNKNOWN_ORIGIN"
+          ]
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "status": {
+          "enum": [
+            "PROPOSED",
+            "RESEARCH_ONLY",
+            "FROZEN",
+            "USED",
+            "REJECTED",
+            "UNKNOWN"
+          ]
+        },
+        "source_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          }
+        },
+        "skill_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_payload_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "DynamicQuestionTicket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "blocking_gap_id",
+        "missing_artistic_decision",
+        "source_evidence_to_inspect",
+        "actual_question",
+        "possible_answer_effects",
+        "next_action"
+      ],
+      "properties": {
+        "question_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocking_gap_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missing_artistic_decision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_evidence_to_inspect": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          }
+        },
+        "actual_question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "possible_answer_effects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "StyleAuthorityReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "controlled_aesthetic_decisions",
+        "source_supported_but_missing_from_skill",
+        "skill_present_but_not_compiled",
+        "provider_fields_outside_authority",
+        "candidate_model_inventions",
+        "ungoverned_output_appearance",
+        "original_content_choices",
+        "provider_unobservable_residual_notice"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "controlled_aesthetic_decisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "source_supported_but_missing_from_skill": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "skill_present_but_not_compiled": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "provider_fields_outside_authority": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "candidate_model_inventions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "ungoverned_output_appearance": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "original_content_choices": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "provider_unobservable_residual_notice": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "VisualModelCoverageLedger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "scope_id",
+        "sequence_ids",
+        "dimensions",
+        "relations",
+        "extensions",
+        "open_gaps",
+        "frame_coverage_state"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "VisualModelCoverageLedger"
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DimensionCoverageEntry"
+          }
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RelationCoverageEntry"
+          }
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DimensionCoverageEntry"
+          }
+        },
+        "open_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "frame_coverage_state": {
+          "enum": [
+            "NOT_STARTED",
+            "PARTIAL",
+            "ALL_TARGET_FRAMES_SEEN",
+            "NEEDS_REINSPECTION"
+          ]
+        }
+      }
+    },
+    "CoverageReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "scope_id",
+        "coverage_ledger_id",
+        "state",
+        "gaps",
+        "next_question_id",
+        "image_trial_ready",
+        "provenance_report_id"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "CoverageReview"
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coverage_ledger_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "READY_FOR_ORIGINAL_IMAGE_TRIAL",
+            "BLOCKED_MISSING_SOURCE",
+            "BLOCKED_MISSING_STYLE_DECISION",
+            "BLOCKED_MISSING_OPERATION",
+            "BLOCKED_PROMPT_AUTHORITY",
+            "PARTIAL_CAPABILITY_ONLY",
+            "ARTISTIC_QUALITY_UNPROVEN"
+          ]
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_question_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image_trial_ready": {
+          "type": "boolean"
+        },
+        "provenance_report_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/VisualModelCoverageLedger"
+    },
+    {
+      "$ref": "#/$defs/CoverageReview"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "complete_frame_index": true,
+  "distinct_durations": [
+    256
+  ],
+  "duplicate_pts": [],
+  "end_gap_s": 0.0,
+  "film_sha256": "d283e67b6e32dc142b00364e759f2221cea39000dc5ecdfa495fe17d3334b403",
+  "first_pts": 256,
+  "frame_count_decoded": 60169,
+  "index_path": "workspace\\frames\\d283e67b6e32dc142b00364e759f2221cea39000dc5ecdfa495fe17d3334b403\\index.jsonl.gz",
+  "index_sha256": "fb99c38493ba417d21deeefa016b3cc9337bb8d29561f000c5951ade36eb90ab",
+  "indexed_at": "2026-11-14T22:07:21+00:00",
+  "last_frame_end_s": 1002.8333333333334,
+  "last_pts": 15403264,
+  "metadata_count_mismatch": false,
+  "metadata_nb_frames": null,
+  "problems": [],
+  "pts_discontinuities": [],
+  "pts_monotonic": true,
+  "stream_duration_s": 1002.816667,
+  "time_base": "1/15360",
+  "vfr_observed": false,
+  "video_path": "..\\source_clips\\A.I. ‐ Humanity's Final Invention_.mp4"
+}

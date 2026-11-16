@@ -1,0 +1,50 @@
+{
+  "schema": "vme.provider_capabilities/1",
+  "note": "Doc-cited snapshots from the v1.3 spec (15 §5, 19). NOT verified by any probe in this build. A paid probe requires a ProviderAuthorization naming the exact user-confirmed AIR id. 'FLUX Klein 7B' is not a confirmed Runware model and is refused.",
+  "snapshots": [
+    {
+      "snapshot_id": "runware-flux2-klein-4b-doc-2026-11-14",
+      "provider": "runware",
+      "model_air_id": "runware:400@4",
+      "model_name": "FLUX.2 [klein] 4B",
+      "source": "https://runware.ai/docs/models/bfl-flux-2-klein-4b (as cited by spec 15 §5 / 19; not re-fetched offline)",
+      "verified_by_probe": false,
+      "user_confirmed_model": false,
+      "supported_capabilities": ["textToImage", "referenceImages", "imageEdit"],
+      "max_prompt_chars": 10000,
+      "min_dimension": 128,
+      "max_dimension": 2048,
+      "dimension_multiple": 16,
+      "max_reference_images": 4,
+      "output_formats": ["PNG", "WEBP"],
+      "output_type": "base64Data",
+      "supports_negative_prompt": false,
+      "allowed_parameters": ["seed", "steps", "CFGScale"],
+      "alpha_output_verified": false,
+      "cost_per_image_usd": null,
+      "api_base": "https://api.runware.ai/v1"
+    },
+    {
+      "snapshot_id": "runware-flux2-klein-9b-doc-2026-11-14",
+      "provider": "runware",
+      "model_air_id": "runware:400@2",
+      "model_name": "FLUX.2 [klein] 9B",
+      "source": "spec 15 §5 cites runware:400@2 for FLUX.2 [klein] 9B; limits not individually verified",
+      "verified_by_probe": false,
+      "user_confirmed_model": false,
+      "supported_capabilities": ["textToImage", "referenceImages", "imageEdit"],
+      "max_prompt_chars": 10000,
+      "min_dimension": 128,
+      "max_dimension": 2048,
+      "dimension_multiple": 16,
+      "max_reference_images": 4,
+      "output_formats": ["PNG", "WEBP"],
+      "output_type": "base64Data",
+      "supports_negative_prompt": false,
+      "allowed_parameters": ["seed", "steps", "CFGScale"],
+      "alpha_output_verified": false,
+      "cost_per_image_usd": null,
+      "api_base": "https://api.runware.ai/v1"
+    }
+  ]
+}

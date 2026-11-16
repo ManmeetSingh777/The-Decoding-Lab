@@ -1,0 +1,25 @@
+{
+  "complete_frame_index": true,
+  "distinct_durations": [
+    256
+  ],
+  "duplicate_pts": [],
+  "end_gap_s": 0.0,
+  "film_sha256": "584dbc4c52eea142fbdd9628a6323c1a5e82329a8b4bb25ee5f648070f1faa8d",
+  "first_pts": 256,
+  "frame_count_decoded": 78231,
+  "index_path": "workspace\\frames\\584dbc4c52eea142fbdd9628a6323c1a5e82329a8b4bb25ee5f648070f1faa8d\\index.jsonl.gz",
+  "index_sha256": "4e2246fe43c4b81a4780774538b6f70abc13ed498b5f81903eeb33b554200f61",
+  "indexed_at": "2026-11-14T22:09:23+00:00",
+  "last_frame_end_s": 1303.8666666666666,
+  "last_pts": 20027136,
+  "metadata_count_mismatch": false,
+  "metadata_nb_frames": null,
+  "problems": [],
+  "pts_discontinuities": [],
+  "pts_monotonic": true,
+  "stream_duration_s": 1303.85,
+  "time_base": "1/15360",
+  "vfr_observed": false,
+  "video_path": "..\\source_clips\\AI Just Crossed the Terrifying Line - Now What_.mp4"
+}

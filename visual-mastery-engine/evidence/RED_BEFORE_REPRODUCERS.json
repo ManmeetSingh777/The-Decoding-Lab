@@ -1,0 +1,11 @@
+{
+ "R01_packet_custom_id_len": 74,
+ "R01_valid": false,
+ "R04_uses_uuid5": true,
+ "R04_uses_uuid4": false,
+ "R05_includeCost_in_compiler": false,
+ "R07_has_reservation": false,
+ "R08_author_skill_references_empty_literal": true,
+ "R09_decision_id_from_dims_only": true,
+ "R13_s0_completes_with_sixth_pending": true
+}

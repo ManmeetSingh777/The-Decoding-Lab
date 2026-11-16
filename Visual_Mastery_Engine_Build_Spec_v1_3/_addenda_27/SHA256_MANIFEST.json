@@ -1,0 +1,19 @@
+{
+  "package": "VME v1.3 Addendum 27",
+  "purpose": "Only new addendum; v1.3 plus Addenda24-26 are unchanged",
+  "files": {
+    "27_COMPLETE_VISUAL_MODEL_AND_PROVENANCE_ADDENDUM.md": "1c298ab48cd1d37452fc6271d941fab0574120d7bec18ea3edf8a9586a7d29ac",
+    "27_WORKED_EXAMPLE_TRACE_AND_AUDIT_DRILLS.md": "6d1df96d00d966955e423b3ce7c2a5b12aa770841248d6a3f5e3664e3450fe6a",
+    "27_TYPED_COVERAGE_AND_PROVENANCE.schema.json": "c57e0f408d0eed440a41c02f3676703e918dac4bd4e3a28e18cd40fdd53e34d9",
+    "27_SYNTHETIC_COVERAGE_EXAMPLE.json": "96ba56d8950e055a1157a81319abdc6228c2b2056b63bce9fa81eeaff031b13e",
+    "00_COMPLETE_LAUNCH_V13_ADDENDA_24_25_26_27_PASTE_THIS.txt": "d3d7dfd7414b442d3141bcc9b133598cf65cb13516523658973c1280fe401acd",
+    "README_INSTALL_ADDENDUM27.md": "09d8ba611b0ba605a411101118c5db1cb17febc1a3f7244814afda91aaa081b1"
+  },
+  "local_spec_tests": {
+    "schema_meta_validation": "PASS",
+    "positive_example_schema": "PASS",
+    "missing_required_field_rejected": "PASS",
+    "launch_references_addendum27": "PASS",
+    "offline_audit_stop": "PASS"
+  }
+}

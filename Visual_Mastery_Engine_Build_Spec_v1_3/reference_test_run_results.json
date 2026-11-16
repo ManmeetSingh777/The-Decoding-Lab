@@ -1,0 +1,21 @@
+{
+  "reference_impl_v12": {
+    "tests_run": 7,
+    "passed": 7,
+    "scope": "miniature compiler only",
+    "command": "cd reference_impl && python -m unittest -v"
+  },
+  "reference_impl_v13": {
+    "tests_run": 29,
+    "passed": 29,
+    "scope": "miniature offline learning/skill authority only",
+    "command": "cd reference_impl_v13 && python -m unittest -v"
+  },
+  "schema_validation": {
+    "v12": true,
+    "v13": true
+  },
+  "real_provider_requests": 0,
+  "real_film_vlm_frames": 0,
+  "finished_engine_implemented": false
+}

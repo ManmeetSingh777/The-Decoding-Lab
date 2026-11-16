@@ -1,0 +1,61 @@
+{
+  "record_type": "VisualModelCoverageLedger",
+  "scope_id": "fixture_original_creature_world_01",
+  "sequence_ids": [
+    "SYNTHETIC_sequence_01"
+  ],
+  "dimensions": [
+    {
+      "dimension": "CHARACTER_FACE_ACTING",
+      "status": "RELEVANT_UNKNOWN",
+      "evidence": [
+        {
+          "source_hash": "SYNTHETIC_SHA",
+          "sequence_id": "SYNTHETIC_sequence_01",
+          "frame_start": 0,
+          "frame_end": 3,
+          "evidence_kind": "SYNTHETIC_FIXTURE"
+        }
+      ],
+      "why_relevant": "A moving close-up face appears in fixture",
+      "missing_decisions": [
+        "new-view eye placement dependency"
+      ],
+      "production_consumers": [
+        "canonical_to_three_quarter_character_edit"
+      ],
+      "connected_dimensions": [
+        "CHARACTER_WHOLE_DESIGN",
+        "DEPTH_VIEWPOINT"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "relation_id": "face_view_connection",
+      "participants": [
+        "CHARACTER_FACE_ACTING",
+        "DEPTH_VIEWPOINT"
+      ],
+      "evidence": [
+        {
+          "source_hash": "SYNTHETIC_SHA",
+          "sequence_id": "SYNTHETIC_sequence_01",
+          "frame_start": 0,
+          "frame_end": 3,
+          "evidence_kind": "SYNTHETIC_FIXTURE"
+        }
+      ],
+      "status": "UNKNOWN",
+      "producing_effect": "must choose original face redrawing for novel camera angle",
+      "missing_decisions": [
+        "new-view eye placement dependency"
+      ]
+    }
+  ],
+  "extensions": [],
+  "open_gaps": [
+    "new-view eye placement dependency"
+  ],
+  "frame_coverage_state": "NOT_STARTED"
+}

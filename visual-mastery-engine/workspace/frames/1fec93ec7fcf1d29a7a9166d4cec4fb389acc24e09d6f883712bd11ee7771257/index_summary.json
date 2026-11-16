@@ -1,0 +1,25 @@
+{
+  "complete_frame_index": true,
+  "distinct_durations": [
+    512
+  ],
+  "duplicate_pts": [],
+  "end_gap_s": 0.0,
+  "film_sha256": "1fec93ec7fcf1d29a7a9166d4cec4fb389acc24e09d6f883712bd11ee7771257",
+  "first_pts": 512,
+  "frame_count_decoded": 23570,
+  "index_path": "workspace\\frames\\1fec93ec7fcf1d29a7a9166d4cec4fb389acc24e09d6f883712bd11ee7771257\\index.jsonl.gz",
+  "index_sha256": "e4569acfdab44a102377d2c70a47e791adc5109365c330b98bf04cd14c01d59c",
+  "indexed_at": "2026-11-14T22:02:08+00:00",
+  "last_frame_end_s": 785.7,
+  "last_pts": 12067840,
+  "metadata_count_mismatch": false,
+  "metadata_nb_frames": null,
+  "problems": [],
+  "pts_discontinuities": [],
+  "pts_monotonic": true,
+  "stream_duration_s": 785.666667,
+  "time_base": "1/15360",
+  "vfr_observed": false,
+  "video_path": "..\\source_clips\\The Most Insane Megaproject You Never Heard About.mp4"
+}

@@ -1,0 +1,25 @@
+{
+  "complete_frame_index": true,
+  "distinct_durations": [
+    512
+  ],
+  "duplicate_pts": [],
+  "end_gap_s": -0.0,
+  "film_sha256": "2a54f0de183cd99bb0d049d63f256806b216113e3e6fbcf081d998d7062abcb5",
+  "first_pts": 512,
+  "frame_count_decoded": 12220,
+  "index_path": "workspace\\frames\\2a54f0de183cd99bb0d049d63f256806b216113e3e6fbcf081d998d7062abcb5\\index.jsonl.gz",
+  "index_sha256": "0ef49712ccb5804949c1fd84bdb7ec20bb3ab7d1e4f88108ec5465e835fd9b13",
+  "indexed_at": "2026-11-14T22:00:26+00:00",
+  "last_frame_end_s": 407.3666666666667,
+  "last_pts": 6256640,
+  "metadata_count_mismatch": false,
+  "metadata_nb_frames": null,
+  "problems": [],
+  "pts_discontinuities": [],
+  "pts_monotonic": true,
+  "stream_duration_s": 407.333333,
+  "time_base": "1/15360",
+  "vfr_observed": false,
+  "video_path": "..\\source_clips\\How to Make a Kurzgesagt Video in 1200 Hours.mp4"
+}

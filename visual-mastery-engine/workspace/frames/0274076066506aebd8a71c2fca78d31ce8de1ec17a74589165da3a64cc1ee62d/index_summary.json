@@ -1,0 +1,25 @@
+{
+  "complete_frame_index": true,
+  "distinct_durations": [
+    256
+  ],
+  "duplicate_pts": [],
+  "end_gap_s": -0.0,
+  "film_sha256": "0274076066506aebd8a71c2fca78d31ce8de1ec17a74589165da3a64cc1ee62d",
+  "first_pts": 256,
+  "frame_count_decoded": 50642,
+  "index_path": "workspace\\frames\\0274076066506aebd8a71c2fca78d31ce8de1ec17a74589165da3a64cc1ee62d\\index.jsonl.gz",
+  "index_sha256": "4156b93fd76c4d9d2ec63302c2385ae5fc71a101a486537597bd5f126497799b",
+  "indexed_at": "2026-11-14T22:06:02+00:00",
+  "last_frame_end_s": 844.05,
+  "last_pts": 12964352,
+  "metadata_count_mismatch": false,
+  "metadata_nb_frames": null,
+  "problems": [],
+  "pts_discontinuities": [],
+  "pts_monotonic": true,
+  "stream_duration_s": 844.033333,
+  "time_base": "1/15360",
+  "vfr_observed": false,
+  "video_path": "..\\source_clips\\GERMANY IS OVER.mp4"
+}

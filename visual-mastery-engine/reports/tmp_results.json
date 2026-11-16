@@ -1,0 +1,33 @@
+{
+ "exitstatus": 0,
+ "results": [
+  {
+   "nodeid": "tests/test_real_path.py::test_real_modules_never_import_fixtures_or_testing",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-S0S9",
+    "C13"
+   ],
+   "phase": "OFFLINE",
+   "path": "REAL",
+   "duration_s": 0.066,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_real_path.py::test_hard_kill_mid_packet_reconciles_batches",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A65",
+    "B06",
+    "ADD24-D4-1",
+    "ADD24-D4-2"
+   ],
+   "phase": "OFFLINE",
+   "path": "REAL",
+   "duration_s": 258.052,
+   "longrepr": null
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+  "archive_sha256": "8aaf3d51a878bb3c3670bfe31d8e81fc0023186e7f7e53f3aa00fbb6fa8ad2c8",
+  "archive_entry_count": 259,
+  "archive_integrity_testzip": null,
+  "anthropic_taskid_generated_shape_example": {
+    "length": 74,
+    "conforms_max64": false
+  },
+  "runware_taskuuid_generated_shape_example": {
+    "value": "c182e394-aac4-5d9a-9f5d-a34dfda25c93",
+    "uuid_version": 5,
+    "documented_expected_version": 4
+  },
+  "source_confirmations": {
+    "has_empty_style_ref": true,
+    "uses_uuid5_in_gateway": true,
+    "has_sixth_optional_in_S1": true,
+    "has_investigation_missing_source_stop": true,
+    "has_default_single_actor": true
+  }
+}

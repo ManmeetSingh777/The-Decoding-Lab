@@ -1,0 +1,22 @@
+# third-party source films: not redistributed (4 of 6 also exceed GitHub's 100 MB limit); identities are in SOURCE_FILMS_NOT_INCLUDED.md
+source_clips/*.mp4
+*.mp4
+*.mov
+*.mkv
+# decoded source frames (third-party pixels)
+visual-mastery-engine/workspace/**/*.png
+# environments, dependencies, caches, rebuildable build output
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+visual-mastery-engine/audit_build/
+visual-mastery-engine/audit_build_v3/
+visual-mastery-engine/render/remotion/public/
+*.sqlite-wal
+*.sqlite-shm
+.env
+# the engine's own history is pushed to the remote as branches vme/*
+visual-mastery-engine/.git_inner_tmp/

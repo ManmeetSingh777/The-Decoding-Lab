@@ -1,0 +1,144 @@
+# VME V1.3 — FINAL CONSOLIDATED R3 ONE-PASS END-TO-END ENGINEERING REPAIR
+
+You are continuing the SAME existing repository at:
+G:\The Decoding Lab\visual-mastery-engine
+
+This is NOT a new project, NOT a shortcut to start analysis, and NOT a request
+for another high-level plan. The attached ZIP is
+VME_V13_ONE_PASS_END_TO_END_REPAIR_R3.zip. The user has NOT sent you an earlier
+independent repair package. USE THIS R3 PACKAGE as the consolidated handoff.
+
+MISSION: Fix ALL known engineering, investigation, source-first character-art,
+source-to-skill, and skill-to-original-AV-construction gaps coherently in THIS
+one implementation effort. The outcome must be a genuinely runnable, causally
+enforced machine, not merely more tests or filled reports. Do not lower quality,
+mark a known unimplemented operation green, invent image evidence, silently
+fallback to generic anatomy/linear animation, or shorten scene observation.
+
+READ IN FULL BEFORE ANY CHANGE:
+  README_USE_R3_ONLY.md
+  01_INDEPENDENT_FORENSIC_AUDIT.md (F01–F18, actual observed code paths)
+  02_EXACT_END_TO_END_IMPLEMENTATION.md (file/function-level repair algorithms)
+  03_NO_WAIVER_ACCEPTANCE_MATRIX.md (18 faults, 12 recurring blockers, proof)
+  reference_guards.py + test_reference_guards.py (29 standalone adversarial cases)
+  INDEPENDENT_REDTEAM.py (5 original independent failures against uploaded ZIP)
+  test_archived_wiring.py (5 live-module boundary tests)
+  corrected_modules/vme/... (seven narrow, illustrated module changes; MERGE,
+    NEVER overwrite a newer or independently altered local file blindly)
+
+ALSO READ the EXISTING authoritative contract/Spec v1.3, Addenda 24–28,
+Addendum 29 if present, approved source-evidence history from R1–R7.2,
+ST28 A–G, R01–R24, existing 166-question governance and all current open
+source/capability ledgers. Do not mass-redecode old references; investigate
+only precise gaps or counterexamples with preserved source hashes.
+
+STEP 0 — NON-DESTRUCTIVE BASELINE:
+1. Print actual current HEAD, uncommitted changed/untracked file list and
+   working directory. Preserve ALL user and other-agent changes. Make a
+   recoverable working branch/checkpoint without destructive reset/checkout.
+2. Print input ZIP path, content inventory and SHA256. Confirm which earlier
+   spec/continuity sources are actually present. If any mandatory file is
+   absent, say exactly which and where it was last seen; don't invent contents.
+3. Run and save the 5 independent baseline tests on current code. Run the 29
+   reference-contract cases and 5 live-module boundary cases; distinguish
+   failures on current code from reference-fixture positives. This is the
+   input state, NOT a reason to run all 90-minute tests yet.
+4. Read actual consumer paths from film selection → source decoding/native
+   frames and audio → P0–P6 → observation/event state → question/cluster →
+   evidence/authored decision → immutable skill → conditioned image payload,
+   character art states, motion/camera/attention/world/audio → actual MP4.
+   Write the complete function and data lineage graph BEFORE patching. Compare
+   intended behavior and code at every edge.
+
+STEP 1 — BUILD EVERYTHING IN THE BLUEPRINT, NO DEFERRAL:
+A. Implement every F01–F18 and legacy 12 blockers in the exact file/function
+   paths of `02_EXACT_END_TO_END_IMPLEMENTATION.md`; use demonstrated corrected
+   modules as reference. Add integrated tests at every producer/writer boundary.
+B. Enforce both SOURCE-ART coverage and ORIGINAL PRODUCTION coverage; per frame,
+   source PTS, event, character state and visual relationship, not just a
+   generic category filled or a report with impressive wording. Use native
+   crops for high-impact ambiguities, across multiple unlike references.
+C. SOURCE FIRST for character art: inspect the actual whole illustrated entity,
+   outer contour, taper/width, negative space, all connected shape relationships,
+   piece junctions, fill/edge/material, lighting/shadow and actual view/pose
+   drawings BEFORE any anatomy label or generic skeleton. Review multi-state
+   identity, expression, grips, occlusion/contact and integration with world.
+   Never introduce tube arms, broad/narrow defaults, automatic fingers,
+   disconnected silhouettes or no-shading art by uninformed extrapolation.
+D. Make 2–5 linked artistic gaps visible, ask exactly ONE high-leverage
+   discriminating producer question at a time, investigate contrasting source
+   witnesses and opposing interpretations. No self-authorized witness IDs,
+   no model-declared human approvals, no disjoint partial branch coverage.
+E. Make the core decision writer fail closed for missing authority, irrelevant
+   stage, invalid source, insufficient relation/action, unqualified reference
+   requirements, conflicting applicability and unowned operators. Store
+   candidate/unknown separately; only proven evidence advances a skill.
+F. SOURCE-OWNED image prompts AND ACTUAL NON-IMAGE OPERATIONS: no freeform
+   model/style overrides, no silent text-only fallback if source images matter,
+   exact image references with rights/capability checks and independent human
+   approvals; original separately approved character assets, art-state/pose
+   changes, distinct multi-actor identities, motion/choreography/event graph,
+   attention/camera/world treatments, real AV timing/mux. Every skill has
+   content-addressed input → actual payload/track/render consumer and ablation.
+G. Fail integrated render on invalid ffprobe/frame/PTS/audio/motion facts,
+   maintain separate diagnostic scope. A successful silent still does not
+   qualify an animated audiovisual film.
+H. Exact prompt/protocol/parser/provider/image bytes/source/selection/PTS/
+   boundary/consent hashing; invalidation is semantic, no stale promotions,
+   no duplicate uncertain paid call. Cold start and crash restoration must
+   preserve raw evidence, active gap and precise unknown state.
+
+STEP 2 — TEST THE INTEGRATED BEHAVIOR, NOT ONLY SCHEMAS:
+1. For each F01–F18 and 12 legacy blockers run positive, negative, mutation
+   and (where relevant) cross-film/actor/state/scene tests. Each negative must
+   fail with EXACT intended root cause, not some unrelated exception.
+2. Capture actual outgoing source-analysis P0–P6 system/user text and target
+   byte hashes from fake provider. Capture actual compiled IMAGE request and
+   motion/world/camera/attention/audio event program from exact same skills.
+3. Create an offline, novel two-actor original production canary that exercises
+   source-bound art decisions, actor-distinct heads/hands/contact states,
+   shading/light, overlapping actions, perspective/attention, temporal cues,
+   audio data and technical renderer rejection. Mark artistic quality
+   UNPROVEN if no actual real assets/MP4 and human source review happened.
+4. Remove/flip each important source rule/prompt clause/asset/motion/audio
+   guard; the expected LOCAL operation/render should change or explicitly
+   BLOCK. Include wrong-source, wrong-PTS, unseen crop, generic character,
+   disjoint conditions, ambiguous refs, same-actor alias, camera-only motion,
+   static audio and off-sync negative cases.
+5. Only when the architecture and targeted tests are stable, execute full
+   repo test suite + full fresh-extraction suite on FINAL actual commit;
+   static rules, provider strict fake, pyflakes/mypy/compileall/node-check,
+   spending/consent refusals, hard-kill/recovery, replay hashes, SHA manifest.
+   Do NOT cite old runs as final. If final code changes, rerun the qualifying
+   checks. Do not secretly shorten/skip slow drills.
+
+STEP 3 — EXACT DELIVERABLE/STOP:
+Export a NEW archive:
+G:\The Decoding Lab\VME_V13_R3_FINAL_INDEPENDENT_AUDIT.zip
+
+Include ALL evidence items listed in Section 8 of the blueprint, source/art
+and production ledgers separately, function-level requirement matrix,
+the changed code and complete diffs, final tests/real output captures,
+mutation results, all hash/consent records, clean-extraction replay and
+per-capability PASS/OPEN/BLOCKED with honest evidence. State unresolved
+resources (actual 15+1 video files, exact sixth boundaries, user-paid call
+approval, third-party source image upload authorization) explicitly.
+
+DO NOT run paid APIs, upload source media or initiate the 15+1 full artistic
+investigation without new user permission. The offline implementation must
+include the real pathways but stay within approved local/simulated work.
+
+Report succinctly: (a) final repo HEAD/dirty status, (b) 18/18 repair
+statuses and capability proof, (c) exact final repo/fresh tests and failures,
+(d) ZIP path and SHA256, (e) one exact list of user decisions required for a
+bounded real native-source/character/AV calibration, (f) verdict whether the
+code architecture is fit for that canary. Stop exactly with:
+
+STOPPED_FOR_INDEPENDENT_IMPLEMENTATION_AUDIT
+
+THIS IS ONE CONSOLIDATED IMPLEMENTATION. If a specification point is ambiguous,
+resolve it by actual source/evidence authority, conservatively and explicitly
+without weakening the intended behavior; document the chosen contract with
+its proof. Do not stop after a partial subcomponent and ask for another repair
+prompt when the engineering work can be completed locally under existing
+authority. A named external human consent/resource gate remains a true stop.

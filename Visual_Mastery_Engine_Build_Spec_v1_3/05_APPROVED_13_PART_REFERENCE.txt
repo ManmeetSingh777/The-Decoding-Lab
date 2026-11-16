@@ -1,0 +1,661 @@
+# **AnimationLab — The system we're actually going to build**
+
+I've read both of your attached notes, especially your corrections about asking the right questions, identifying high-impact differences, converting observations into reusable skills, and involving you in every visual iteration.
+
+I'm making a clear decision:
+
+**We should build one continuous, question-driven visual learning system. It should discover what's making our output worse than professional Kurzgesagt artwork, investigate the biggest cause, turn the finding into a working production skill, create new artwork using that skill, show you the result, and repeat.**
+
+The important part is that this isn't a research project followed by a separate animation project.
+
+**Research, skill creation, artwork generation, visual judgment, and improvement must happen inside the same working loop.**
+
+I also rechecked the actual [open-edits reverse-engineering skill](https://github.com/kevinbadi/open-edits/blob/main/skills/reverse-engineer/SKILL.md?utm_source=chatgpt.com). It measures references, requires looking at actual frames, connects observed editing devices to executable functions, renders a demonstration, compares the result, and improves the skill itself. We should preserve that proven operating structure, while replacing its limited editing observations with our much stronger visual-artwork investigation.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://github.com\&sz=32)
+
+GitHub
+
+
+
+## **The five decisions I'd lock in**
+
+| Decision                                        | What we're doing                                                                                                                        |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **What controls the investigation?**            | The largest visible differences between professional reference quality and what our system produces                                     |
+| **How do we find the right questions?**         | Start with those differences, identify their likely causes, then investigate only the important unanswered causes                       |
+| **How do we convert observations into skills?** | Build and save actual generation procedures, visual references, working functions, successful examples and corrections                  |
+| **How do agents work?**                         | Primarily sequentially, sharing one record of evidence and decisions; specialists are created only when a specific problem requires one |
+| **Who judges the progress?**                    | Independent visual comparison plus your review of every significant original-artwork iteration                                          |
+
+I would not begin with a fixed team of ten analysts, a giant 166-question form, or an instruction to analyze every frame in extraordinary detail.
+
+Those things can generate enormous amounts of information without necessarily producing one magnificent original scene.
+
+Our system instead needs to become exceptionally good at answering:
+
+**What is the biggest thing we're missing? What exactly produces that quality? Can we create it ourselves? And did the new method actually improve our original output?**
+
+## **1. The actual system: six connected parts**
+
+## **Visual Mastery Engine**
+
+One continuous learning and production system
+
+**1. Reference Library**
+
+The five original films, their frames, important sequences, and previously examined evidence.
+
+**2. Quality Gap Finder**
+
+Compares professional examples with our original creations and identifies the biggest missing visual quality.
+
+**3. Question-Driven Investigator**
+
+Finds the specific source evidence and production knowledge needed to solve that missing quality.
+
+**4. Skill Builder**
+
+Converts the findings into real image-generation procedures, editing methods, animation functions and reusable instructions.
+
+**5. Visual Producer**
+
+Uses the skills to create new original images, illustrations, environments and animated scenes.
+
+**6. Comparison + Your Review**
+
+Shows the actual output, finds the biggest remaining difference, and decides what to improve next.
+
+The next learning cycle begins with the largest remaining quality gap.
+
+This is not six separate AI projects. It's one program with six responsibilities.
+
+And importantly, the system doesn't spend its first several hours collecting random observations.
+
+**It starts producing visual results early, so that research is always connected to something we genuinely need to improve.**
+
+## **2. How we identify the *right* high-impact thing to investigate**
+
+This needs more precision than asking, "What looks different?"
+
+My choice is to use **direct visual comparisons to drive the investigation**.
+
+### **First, establish the reference standard**
+
+Take visually diverse examples from the five films: a rich environment, a complicated illustrated object, an expressive character, a dramatic perspective change, and a scene with several simultaneous actions.
+
+These aren't permanent style templates. They're examples that reveal different strengths of the professional work.
+
+We don't assign them arbitrary numerical beauty scores.
+
+We study what makes each visually excellent, then compare our own work against those qualities.
+
+### **Second, create our own original baseline**
+
+Give the Visual Producer original briefs that are **different from the five films**.
+
+For example, one could involve a futuristic underground laboratory and another a strange ecosystem beneath an icy ocean.
+
+The same initial art-generation tools create these scenes without any newly learned Kurzgesagt-specific skill.
+
+Now we can see the real capability gap of our selected tools.
+
+That's important. If the image model already creates attractive shading, spending hours reverse-engineering shading may have little benefit. If it produces beautiful objects but generic environments, world construction becomes the bigger problem.
+
+### **Third, find the three largest visible differences**
+
+The system compares the originals with the professional reference examples, looking first at the overall frame and then examining the details responsible for the visible gap.
+
+For example:
+
+[Vector scientific laboratory interior empty scene in flat style](https://images.openai.com/static-rsc-4/C5e8BWzBhfCJLGVl0zpj0q9g2wauQAxYjP94fZz58qXrsySJdMQi1yjglQOLl7shwzxuBZzK554CZjq6U7ClupZADfT4GQjwOgqIeFnjkGcb6XxNF5U-xK3paLahdgL9cnaQ4oa9cnhak2wUxH48w1XXymiqhGwtQEsp5482NWbwcuqdIuKqmDNIzwdrxBdE?purpose=inline)
+
+Illustrative weak-output example
+
+[Biologics Pharma Innovation Programme Singapore (BioPIPS)](https://images.openai.com/static-rsc-4/_lRZyuslEt1vlw3sXRi0jqfxV34tlPIkUmccjl3Stg3FtkRNfRVcZqbp37h7zRSiZJ10K3OswfXXRhPe6Og8q4mg6MJAPckPXIc88RD-iDHhDBTP8b1M4ehdCJoUVy8ygQup_Q28QU6d3OzZ2bl_ictQ7Xq5zJYibNcDqK-otUs?purpose=inline)
+
+Illustrative richer-artwork target
+
+Conceptual examples for explaining the comparison method, not actual results from the new system or frames from the five films.
+
+The differences might be:
+
+| Observed difference                                              | Significance                               |
+| ---------------------------------------------------------------- | ------------------------------------------ |
+| The whole environment looks empty and generic                    | Changes the impression of the entire scene |
+| Objects look like unrelated icons instead of one designed world  | Damages the overall visual identity        |
+| Lighting looks pasted onto objects rather than belonging to them | Weakens the professional finish            |
+| A tiny highlight is slightly misplaced                           | Usually a much smaller problem             |
+
+The first three are worth investigating before the fourth.
+
+But there is an important rule: **we rank problems by how much fixing them would actually improve the result, not simply by how much of the frame they occupy.**
+
+A small face can dominate the viewer's attention. A slightly incorrect expression could matter more than a large background detail.
+
+### **The high-impact decision rule**
+
+Before choosing the next investigation, the system must answer:
+
+| Question                         | Required reasoning                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| What is visibly wrong?           | Identify the difference using real images, not a generic style category                                 |
+| How much does it affect quality? | Determine whether viewers notice it immediately and whether it weakens the whole image or sequence      |
+| Does the problem recur?          | Check whether the same weakness appears in other kinds of original scenes                               |
+| What probably causes it?         | Identify a concrete missing production capability                                                       |
+| Can we test a correction?        | Specify what should visibly improve when the method changes                                             |
+| Is it our best next target?      | Compare its expected improvement against other observed problems and the time and cost of addressing it |
+
+The output of this step is **one high-priority problem with a specific visual target**.
+
+Not a general assignment such as "research illustration."
+
+## **3. The question engine — how we investigate without becoming vague or narrow**
+
+This is the intellectual heart of the system.
+
+The investigator doesn't receive a fixed list of 200 questions.
+
+It receives a precise problem and keeps asking the next question necessary to solve it.
+
+### **Example: our environments look generic**
+
+The initial observation might be:
+
+"Our generated environment looks like unrelated clip-art objects on a background. The professional reference environments look like deliberately constructed, visually rich worlds."
+
+That's a useful observation. But it is not yet an explanation.
+
+The investigation proceeds through a chain:
+
+| Question                                                       | What we're trying to discover                                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **What is the largest visible difference?**                    | Is it poor individual assets, weak depth, inconsistent art treatment, insufficient environmental structure, or something else? |
+| **Where is that difference visible in the five films?**        | Find contrasting original examples rather than inventing the answer                                                            |
+| **What specific artistic decisions produce it?**               | Determine how the professional scenes organize and construct their visible content                                             |
+| **Which decisions recur across different types of worlds?**    | Separate transferable production principles from a particular forest, city or laboratory                                       |
+| **Which decisions does our current generator fail to make?**   | Identify the actual missing capability, not merely describe the reference                                                      |
+| **What operation can make those decisions for a new subject?** | Establish a real image-generation, editing or construction procedure                                                           |
+| **What should improve if this explanation is correct?**        | Make a prediction that can be checked in original artwork                                                                      |
+| **Did it improve? What is still wrong?**                       | Test the explanation and decide whether to deepen, replace or qualify it                                                       |
+
+This gives us specificity without forcing us to analyze every irrelevant contour.
+
+The investigation follows the strongest cause, wherever the evidence leads.
+
+### **An important rule: no invented certainty**
+
+Imagine the investigator sees beautifully layered environments and concludes that Kurzgesagt uses a specific illustration procedure.
+
+Unless the footage actually supports that conclusion, it remains an inference.
+
+We can still test the procedure. It might be an excellent solution.
+
+But the system must distinguish:
+
+**Observed:** The reference contains a particular visible relationship.
+
+**Inferred:** A possible explanation for how that relationship was constructed.
+
+**Demonstrated:** Our actual production method successfully creates the desired relationship.
+
+**Transferable:** The method also works on unfamiliar subjects.
+
+This prevents the agent from turning plausible artistic guesses into supposed facts.
+
+## **4. The most important component: converting findings into a *working skill***
+
+This is where I would be strictest.
+
+A written observation is not a skill. A convincing explanation is not a skill. A prompt that once generated a good image is not necessarily a reusable skill.
+
+**A skill is a production method that accepts new inputs, creates useful outputs, and has evidence showing when it works.**
+
+Claude's own skill architecture supports this approach: a `SKILL.md` file supplies instructions, while additional files can hold references, executable scripts and reusable assets. The detailed material can be loaded only when needed, which helps keep the main agent's working context manageable.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://platform.claude.com\&sz=32)
+
+Claude Platform Docs+1
+
+
+
+### **What one working skill would contain**
+
+Take our hypothetical skill for creating richly illustrated original environments.
+
+Example: `rich-world-construction`
+
+| **Inputs**              | Original world brief, relevant subjects, visual focus, intended viewpoint, environmental requirements and anticipated movement |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Reference knowledge** | Source examples, observed construction choices, successful cross-film relationships and important exceptions                   |
+| **Creation procedure**  | Actual model calls, reference-conditioning instructions, image editing, asset creation and scene assembly steps                |
+| **Outputs**             | Original finished illustration, usable environment layers, relevant visual states and generation records                       |
+| **Quality proof**       | Visual comparison, baseline versus improved version, unfamiliar-subject results and recorded failures                          |
+| **Limitations**         | Conditions where the method fails or needs a different art-generation route                                                    |
+
+The difficult part is the creation procedure.
+
+It cannot simply say:
+
+"Generate a rich Kurzgesagt-style environment with lots of detail."
+
+Instead, it must specify the actual successful sequence of operations.
+
+For example, a candidate method might generate the whole scene's visual design first, establish a coherent art treatment, use guided editing to strengthen important regions, create matching background and foreground artwork, prepare separate layers for motion, and verify that recombining those layers preserves the original visual quality.
+
+**That procedure is a hypothesis until actual results demonstrate it works.**
+
+If it fails, we investigate why. Maybe the image model can't preserve design consistency. Maybe separate asset generation damages the scene. Maybe our visual observations were incorrect.
+
+The correction is added to the reusable method only after it succeeds beyond the original example.
+
+### **The precise skill qualification rule**
+
+**Source observation**
+
+Evidence recorded
+
+**Construction candidate**
+
+Method specified, not yet proved
+
+**Executable method**
+
+Real tool creates the output
+
+**Improving skill**
+
+Demonstrated better results than baseline
+
+**Transferable skill**
+
+Works on different unfamiliar subjects
+
+A method cannot be called mastered merely because the source analysis is detailed.
+
+And we need an especially important comparison: use the same original brief with and without the learned method, keeping the model and other conditions as similar as possible.
+
+If the skill doesn't produce a meaningful improvement, then the observation-to-skill conversion hasn't demonstrated value.
+
+## **5. My decision on sequential versus parallel agents**
+
+**Sequential should be the default.**
+
+I would not use ten independently operating analysts simultaneously for the core artistic investigation.
+
+Your reasoning is strong here: each new discovery can change what the next investigation needs to examine.
+
+If ten agents independently analyze different categories, they may spend enormous effort on things that turn out to have little impact. Worse, their observations can become disconnected from the actual problems in our generated artwork.
+
+Instead, I would use the following structure.
+
+**One Lead Investigator**
+
+Maintains the overall visual-quality objective, chooses the highest-impact problem, remembers prior discoveries and decides which expertise is required next.
+
+**Temporary specialists on demand**
+
+When the current problem requires deep character-art investigation, a relevant specialist is assigned. When the next problem involves camera-driven world changes, a different specialist is assigned.
+
+Specialists are chosen by the actual question, not predefined job titles.
+
+**One Skill Builder**
+
+Turns the investigator's findings into the necessary tool calls, image-generation procedures, code and skill instructions.
+
+**An independent Visual Reviewer**
+
+Examines the actual outputs without simply accepting the investigator's explanations. It identifies defects and checks whether proposed improvements are genuinely visible.
+
+These are logical roles. We don't necessarily need four continuously running models.
+
+The Lead Investigator can orchestrate focused specialist calls, the Skill Builder can use Claude's coding tools, and the Reviewer can be given an independent context so it isn't biased by the explanation that produced the artwork.
+
+Parallel processing is useful for mechanical work—extracting frames, analyzing files or independently reviewing two results. But **the main learning decisions should follow a sequential chain of evidence and results**.
+
+That is the architecture I would choose.
+
+## **6. The exact learning loop, including your involvement**
+
+This is the workflow I want Claude Code or Codex to implement—not merely repeat as instructions.
+
+1. **Choose the largest unsolved visual problem.**
+
+   The system uses our previous outputs, professional reference examples and your feedback to select one concrete problem.
+
+   It records what is wrong, why it matters, and what improvement it expects.
+2. **Investigate the specific relevant source evidence.**
+
+   It returns to the five films, examines the appropriate frames and motion sequences, asks targeted questions, and identifies the strongest supported explanation.
+
+   It must not expand into unrelated microanalysis.
+3. **Create or improve the actual production skill.**
+
+   It produces working instructions, visual-reference selection, model operations, scripts or animation functions.
+
+   The skill must contain enough information to create the desired result without inventing the important missing steps.
+4. **Generate unfamiliar original work.**
+
+   It uses the skill on a new original brief, not on the original reference scene.
+
+   It preserves the baseline so we can see whether the new skill improved the result.
+5. **Review the real output.**
+
+   The independent reviewer examines the actual images or animation, compares them with the baseline and the professional standard, and identifies the largest remaining deficiencies.
+6. **Show you the result and the reasoning.**
+
+   You receive the visual output, before-and-after comparison, the important observations, what changed in the skill, and what the system believes remains wrong.
+
+   You can approve the improvement, reject the judgment, or identify something more important that it missed.
+7. **Preserve the result and choose the next problem.**
+
+   The system saves the original observations, changed method, actual output, evaluation and your feedback.
+
+   Successful transferable changes enter the skill library. Failed attempts remain evidence, not approved knowledge.
+
+   The next iteration targets the most important remaining problem.
+
+### **What each review with you should look like**
+
+## **Visual Learning Review — example format**
+
+Illustrative example; not a real completed run
+
+Current target: richer, more coherent original worlds
+
+[Underground bunker, scientific laboratory interior](https://images.openai.com/static-rsc-4/uldXAiBXydoxJmYmIRLFmolthV1DeJslzRlUT2wCGlrSaODzphLWw3zN4mSRugnETHS3pgmYKQpk4K645_Ppn1CZ9fCBI2bxwMOqZgxlNFnxj2iPcKK_nMbTfvgdQqgz-emvWkxpt_X6uwOyPr-Kr4OSj895epW1DUvii8QM42xa9rGwC9Cu02PkW1g7NMSn?purpose=inline)
+
+Before — baseline illustration
+
+[Cutaway Cross-Section of an Underground Industrial Facility - ChatbotsPlace](https://images.openai.com/static-rsc-4/DsMf4m7kTZmEUOe9-RzfNddLtGuOCyP1C9iOGi5wQNz01QyqTC0lD5OX6Zv_NP-UNeCwK-4TK8TULt4sEwiuasun3p_HsFxeBltN2pQxNGqpYTkcU_HdH78PA-MBXzLvQv7dbBj8JNMs-T-F-uGiv82_h8Sy98hguWlVE1pY_NU?purpose=inline)
+
+After — intended improvement
+
+**What the investigation concluded:** The original scene lacked a coherent environment design, sufficiently distinctive scene-specific artwork, and integrated depth and visual finishing.
+
+**What the skill changed:** A proposed multi-stage whole-scene generation and refinement procedure.
+
+**What still needs checking:** Whether it transfers to an unrelated environment and whether the layers preserve the quality of the finished image.
+
+Example of the feedback controls the real application would provide
+
+Meaningful visual improvement
+
+Some improvement, but the major gap remains
+
+Wrong direction — rethink the cause
+
+&#x20; Copy feedback for the learning runThe real system will preserve this feedback with the corresponding image and skill versions. The examples above are illustrative images, not generated test evidence.
+
+You won't need to approve every internal measurement or minor code change. That would make the process painfully slow.
+
+**You review every meaningful visual learning iteration.** In other words, whenever the system claims it has improved an important artistic capability, you get to see the actual evidence.
+
+It should not silently declare a skill mastered while you haven't seen the results.
+
+## **7. How we keep the iterations fast**
+
+We shouldn't spend hours analyzing before seeing whether the proposed improvement works.
+
+The speed comes from investigating only what's needed to solve the current quality gap.
+
+| Expensive, ineffective behavior                                 | Better behavior                                                                          |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Reanalyze all five films whenever something is wrong            | Reuse the source index and inspect only relevant frames or sequences                     |
+| Generate a 20-page report before touching the production system | Record the key evidence and immediately test a construction procedure                    |
+| Render a two-minute film to inspect one artwork correction      | Generate the affected original image or short animated sequence                          |
+| Continue refining a method that is not improving quality        | Compare with baseline and change the approach if the expected improvement doesn't appear |
+| Rediscover the same visual problem after a session reset        | Read the saved learning state, evidence and skill history                                |
+
+We still build the complete pipeline. We simply don't need to render an entire film whenever we're improving one major visual capability.
+
+That is how the learning loop can operate quickly without becoming a series of unrelated experiments.
+
+### **Protecting the progress**
+
+I'd keep a small persistent learning record containing:
+
+| Record                  | What it remembers                                                      |
+| ----------------------- | ---------------------------------------------------------------------- |
+| Current quality problem | Exactly what we're attempting to improve                               |
+| Source evidence         | Which films, frames and sequences support the investigation            |
+| Questions and findings  | What was answered, what remains uncertain and why                      |
+| Current skill version   | Exact working instructions, scripts, references and model settings     |
+| Original outputs        | Baseline and modified images or animations                             |
+| Comparison              | What visibly improved, worsened or remained unchanged                  |
+| Your verdict            | Accepted, rejected, partially improved, or more investigation required |
+| Next priority           | The highest-impact unresolved difference                               |
+
+Each iteration should be saved to disk and versioned before another one begins.
+
+If Claude Code reaches a usage limit or the session is interrupted, a new session should resume from the exact current problem, skill version and visual evidence—not begin another massive film investigation.
+
+We need to test that restoration process before claiming it's reliable.
+
+## **8. How the system progresses from visual art to magnificent animation**
+
+I agree with your preference for sequential mastery, but there's one necessary refinement.
+
+**We should establish artwork quality first, while designing the artwork for future animation from the beginning.**
+
+Otherwise, we could spend many iterations making gorgeous single images that cannot be separated, redrawn or moved without destroying their quality.
+
+So the progression is:
+
+**Milestone A — Magnificent original frames**
+
+The system can create original illustrated worlds, characters and objects with convincing professional artistic quality across different subjects.
+
+This is our first and biggest focus.
+
+**Milestone B — Magnificent worlds that can change**
+
+Those illustrations support different viewpoints, camera changes, transformations, layers, new drawing states and changes of scale without losing their richness.
+
+We learn which artwork must be redrawn and which can be moved with code.
+
+**Milestone C — Magnificent moving scenes**
+
+Characters, objects, effects, environments and cameras move together convincingly.
+
+The movement is controlled, visually coherent and appropriate to the original scene.
+
+**Milestone D — Complete original visual productions**
+
+The system combines its learned skills to create connected original scenes and eventually complete animated films.
+
+Autonomous creative direction remains a separate capability that we integrate later.
+
+### **One particularly important capability**
+
+We cannot treat perspective changes as merely camera zooms.
+
+When Kurzgesagt moves from one scale or visual world to another, the artwork itself may change.
+
+Our system needs a working method that handles the whole transformation:
+
+| Requirement                   | What the system produces                                         |
+| ----------------------------- | ---------------------------------------------------------------- |
+| Starting illustrated world    | Complete original scene artwork                                  |
+| Destination illustrated world | Complete original scene artwork at the new perspective or scale  |
+| Visual connection             | What remains recognizable between them                           |
+| Intermediate states           | Additional artwork needed to make the change coherent            |
+| Camera movement               | Controlled position, scale, framing and perspective              |
+| Object movement               | Independent movement and changes of visible parts                |
+| Depth and overlap             | Correct layering throughout the transition                       |
+| Attention                     | Clear visual focus as the scene changes                          |
+| Finished result               | Actual moving sequence that retains professional artwork quality |
+
+That should become one reusable *combined* skill, even though it may use several lower-level art and animation functions.
+
+This is how we preserve the connection between constructing a world, travelling through it and making it come alive.
+
+## **9. How we'll prevent overfitting**
+
+We need two kinds of original work.
+
+**The active original scene** is the one we use to improve a skill. Claude sees the outputs, investigates the failures and modifies the procedure.
+
+**The unfamiliar challenge scene** is kept separate. After a method improves the active scene, we run the unchanged method on a different subject.
+
+For example, a skill developed while creating a futuristic laboratory might be challenged with an original biological environment.
+
+If the method succeeds only in the laboratory, it hasn't learned a general way of constructing rich worlds. It has learned a laboratory-specific workflow.
+
+Importantly, the challenge needs to use the same underlying artistic capability but different subject matter. Testing a character-acting skill on a landscape would tell us very little.
+
+And we should preserve both successful and failed transfer examples. That teaches the system where the method applies.
+
+## **10. What Claude Code actually has to build**
+
+This is the engineering specification, rather than just the artistic strategy.
+
+| Component                     | Required working behavior                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Source reader**             | Opens original MP4s, retrieves frames, crops and time sequences, and preserves their source identities    |
+| **Visual benchmark library**  | Stores relevant professional examples grouped by the artistic quality they demonstrate                    |
+| **Original artwork producer** | Makes real image-model calls and stores outputs, prompts, references, model settings and costs            |
+| **Gap finder**                | Shows professional examples beside our creations and identifies the strongest visual deficiencies         |
+| **Question investigator**     | Tracks one important problem through evidence, specific unanswered questions and candidate causes         |
+| **Skill builder**             | Creates and updates `SKILL.md`, supporting references, scripts and actual callable production procedures  |
+| **Animation engine**          | Moves artwork, substitutes drawings, handles layered scenes, camera and effects, and renders actual video |
+| **Independent reviewer**      | Examines the actual output, compares revisions and challenges unsupported claims                          |
+| **Human review checkpoint**   | Presents the visual outputs and accepts your feedback before final skill promotion                        |
+| **Skill library and memory**  | Preserves verified methods, conditions, failed attempts, source evidence and exact continuation state     |
+
+This is intentionally a small conceptual architecture. Each component can be implemented using existing tools wherever possible.
+
+We do not need to invent a completely new image generator, renderer or video editor.
+
+### **The first technical requirement**
+
+Before major analysis spending, the build agent must verify that its selected image-generation and editing tools can actually produce and revise high-quality original artwork.
+
+The system should make a real provider call, retrieve the actual image, inspect it, and establish which editing, reference-conditioning and asset-separation operations are available.
+
+It must not build its entire architecture around features the chosen provider doesn't actually support.
+
+**This is the biggest practical dependency, so we verify it early—not after hours of research.**
+
+## **11. What the first real learning cycle looks like**
+
+I'd start with the biggest visual difference identified from our previous five-film overview:
+
+**Constructing complete, coherent, rich original illustrated worlds.**
+
+But that description is only the initial target.
+
+The system's first task is to generate an original environment and compare it with professional reference examples.
+
+Then it identifies the specific weakness actually present in that output.
+
+If the biggest problem is generic artwork, it investigates why the reference objects are more distinctive.
+
+If the objects are good but the environment feels empty, it investigates how the reference creates complete worlds.
+
+If the environment is rich but visually incoherent, it investigates the methods that unify the artwork.
+
+If the scene looks excellent but cannot be animated, the next priority becomes creating usable drawing states and layers while retaining quality.
+
+**We do not decide the answer before seeing the actual failure.**
+
+This is also why I don't want to commit to a predetermined list of ten specialist agents.
+
+The first real comparisons determine which specialist expertise we require.
+
+### **The initial production target**
+
+The first major integrated proof should be a **20–30-second original visual sequence**, made of several connected shots that demand good artwork, a meaningful change of perspective and coordinated movement.
+
+It is not a toy experiment. It exercises the complete visual pipeline while remaining short enough to examine and improve frequently.
+
+Once that works, we extend the same methods into longer original content, with a 60–120-second audiovisual production as a stronger integrated milestone.
+
+We do not need to make a full two-minute film every time one illustration method changes.
+
+## **12. What could make this fail, and how the implementation responds**
+
+You asked for strong logic, not a long list of speculative fears. So I've narrowed this to the actual engineering dependencies.
+
+| Critical dependency                                   | Built-in response                                                                                                    |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **We misidentify the important visual problem**       | Direct comparisons, your feedback and an independent reviewer can overturn the priority                              |
+| **The source analysis is too shallow or speculative** | The investigator must return to relevant source images, distinguish evidence from inference and test its explanation |
+| **The findings cannot produce artwork**               | No skill promotion without a real executable creation procedure                                                      |
+| **The image model cannot deliver the desired result** | Test available creation routes and change the method or provider instead of adding more adjectives to the prompt     |
+| **A successful method overfits one scene**            | Frozen-method tests on different original subjects                                                                   |
+| **Beautiful artwork falls apart during animation**    | Animation-aware assets, alternate drawings, layered output and real sequence review                                  |
+| **Claude claims progress without evidence**           | Every significant claim links to actual images, clips, source evidence, versioned methods and comparison results     |
+| **Sessions lose reasoning or repeatedly redo work**   | Persistent learning records, versioned output and tested resume behavior                                             |
+
+The important point is that each problem has a response within the architecture. We're not depending on an unexplained leap from analysis to quality.
+
+The one thing I will not claim is guaranteed professional output before testing the real art and animation providers. A logically complete workflow cannot manufacture a capability that its underlying tools lack.
+
+But this design can identify that limitation directly rather than wasting another cycle producing impressive technical reports about weak artwork.
+
+## **13. What success actually means**
+
+We need three levels of success, not one misleading score.
+
+| Level                          | What must be demonstrated                                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Artistic success**           | The system consistently creates beautiful original illustrations and worlds with the relevant professional visual characteristics |
+| **Transferable skill success** | The learned production methods demonstrably improve unfamiliar subjects, not merely one example                                   |
+| **Animation success**          | The same visual richness survives perspective changes, artwork transformations, movement and coordinated interactions             |
+
+The finished visual sequence must satisfy all three.
+
+Our evaluation should include real side-by-side visual judgment, baseline comparisons, motion inspection, and your review.
+
+We should not use a colour-histogram score or a passing unit-test count as a substitute for those things.
+
+And the system must distinguish between artwork that's attractive in its own right and artwork that actually belongs to the targeted visual language.
+
+Both matter.
+
+# **Final architecture decision**
+
+## **What I would authorize building**
+
+The exact working cycle
+
+**See the biggest real visual difference**
+
+Compare professional source qualities with our original output.
+
+**Investigate the right questions**
+
+Find the specific artistic causes and relevant source evidence.
+
+**Create the working method**
+
+Convert the findings into executable, reusable production skills.
+
+**Produce original artwork or animation**
+
+Apply the method to unfamiliar content and retain the actual evidence.
+
+**Compare, show you, improve**
+
+Preserve successful discoveries, reject weak explanations and select the next largest gap.
+
+The key is that the system **learns through production, not merely through observation**.
+
+The observations determine what matters. The questions uncover the relevant artistic principles. The skills turn those principles into actual production. The rendered output reveals whether our understanding was correct.
+
+Then we repeat, always attacking the largest remaining gap.
+
+### **What happens in the next prompt**
+
+I would prepare one implementation specification for a **fresh Claude Code or Codex project**.
+
+It will instruct the coding agent to build this working system, connect real tools, establish the persistent learning records, create the visual comparison process, implement the skill-building and qualification mechanisms, and run the first complete learning iteration.
+
+It will also define the exact files, interfaces, tests, refusal conditions, checkpoint behavior, human review workflow and evidence requirements.
+
+The coding agent won't receive a vague instruction to "deeply analyze Kurzgesagt and build professional skills." It will receive an executable engineering contract.
+
+**My recommendation is to commit to this architecture: sequential, question-driven, output-first, skill-producing, continuously compared against the real visual target, and reviewed by you at every meaningful iteration.**
+
+That's the system I would build.

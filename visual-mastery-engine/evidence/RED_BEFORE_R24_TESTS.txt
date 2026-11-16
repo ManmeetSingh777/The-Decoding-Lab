@@ -1,0 +1,23 @@
+        drills = {"audit/export.py"}
+        assert sorted(set(builders) - drills) == ["compiler/compiler.py"]
+        drill_src = (src / "audit" / "export.py").read_text(encoding="utf-8")
+        assert re.search(r'g\.submit\(\{"positivePrompt"', drill_src), "drill must only feed the raw dict to the gateway (expected refusal)"
+>       assert set(senders) <= {"providers/gateway.py", "providers/runware.py"}
+E       AssertionError: assert {'loop/real.p...s/runware.py'} <= {'providers/g...s/runware.py'}
+E         
+E         Extra items in the left set:
+E         'loop/real.py'
+
+tests\test_compiler_authority.py:96: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_compiler_authority.py::test_static_scan_only_compiler_builds_positive_prompt_and_only_gateway_sends
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed in 0.47s
+E         
+E       assert 1 == 97
+E        +  where 1 = CompletedProcess(args=['G:\\The Decoding Lab\\visual-mastery-engine\\.venv\\Scripts\\python.exe', '-c', "\nimport sys,...-of-gmanm\\pytest-101\\test_hard_kill_mid_packet_reco0\')\n           ^^^^\nNameError: name \'Path\' is not defined\n').returncode
+
+tests\test_real_path.py:197: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_real_path.py::test_hard_kill_mid_packet_reconciles_batches
+1 failed in 0.48s

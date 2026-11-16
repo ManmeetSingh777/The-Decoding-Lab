@@ -1,0 +1,2190 @@
+{
+ "exitstatus": 1,
+ "results": [
+  {
+   "nodeid": "tests/test_assets_character.py::test_opaque_png_never_transparent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B25",
+    "C23"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.022,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_invalid_bytes_rejected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C18"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.066,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_coordinate_mapping_uniform_never_stretch",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C24",
+    "B26"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_animation_demand_and_construction_order_before_generation",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A60",
+    "B27",
+    "A58",
+    "A59",
+    "C20",
+    "C21",
+    "C22",
+    "A45"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_svg_tube_actor_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C19",
+    "C20"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_valid_pack_and_recomposition_matches_canonical",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A41",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.044,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[opaque_claimed-OPAQUE_PNG_CLAIMED_TRANSPARENT]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.02,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[mask_size-MASK_WRONG_SIZE]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.018,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[bytes_changed-LAYER_BYTES_CHANGED]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.015,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[no_clean_plate-MOVING_PART_WITHOUT_CLEAN_PLATE]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.016,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[lr_swap-LEFT_RIGHT_SWAPPED]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.018,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[z_order-Z_ORDER_VIOLATES_CONTACT]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.019,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[anchor-CONTACT_ANCHOR_INCONSISTENT]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.015,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[state_canvas-STATE_CANVAS_MISMATCH]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.018,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[not_canonical-STATE_NOT_CONDITIONED_ON_CANONICAL]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.019,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[outside-LAYER_OUTSIDE_CANONICAL_CANVAS]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.017,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[double_scale-PARENT_SCALE_APPLIED_TWICE]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.017,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[plate_hole-CLEAN_PLATE_HAS_HOLES]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.021,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_injected_asset_failures_detected[no_hand_prop_state-CONTACT_WITHOUT_WHOLE_HAND_PROP_DRAWING]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A40",
+    "A41",
+    "B26",
+    "C22",
+    "C23",
+    "C24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.016,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_recomposition_detects_holes_and_halo",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A41"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_character_answer_rejects_shallow_part_labels",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD24-B2",
+    "A38"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_cross_actor_witness_group_scope",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD24-B1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_assets_character.py::test_identity_consistency_requires_real_outputs",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A21",
+    "A39",
+    "B28",
+    "B29"
+   ],
+   "phase": "ART",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_every_span_owned_content_or_skill",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A33",
+    "A54",
+    "C15",
+    "C16"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.01,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_changing_selected_decision_changes_payload",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A36",
+    "B17",
+    "C29",
+    "ADD25-P03",
+    "ADD26-P02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.055,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_changing_nonselected_prose_does_not_change_payload",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B18",
+    "ADD25-P04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.052,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_removing_required_decision_blocks_with_ticket",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-P02",
+    "A54",
+    "B15"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.054,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_runtime_style_append_and_raw_prompt_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A53",
+    "ADD25-P01",
+    "ADD26-P01",
+    "C14",
+    "B19"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.033,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_static_scan_only_compiler_builds_positive_prompt_and_only_gateway_sends",
+   "outcome": "failed",
+   "when": "call",
+   "req_ids": [
+    "C14",
+    "ADD26-A01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.016,
+   "longrepr": "@pytest.mark.req(\"C14\", \"ADD26-A01\")\n    def test_static_scan_only_compiler_builds_positive_prompt_and_only_gateway_sends():\n        src = ROOT / \"vme\"\n        builders, senders = [], []\n        for p in src.rglob(\"*.py\"):\n            text = p.read_text(encoding=\"utf-8\")\n            rel = p.relative_to(src).as_posix()\n            if re.search(r'[\"\\']positivePrompt[\"\\']\\s*:', text):\n                builders.append(rel)\n            if re.search(r\"\\.send\\(|http_transport\\(\", text) and \"runware\" in text.lower():\n                senders.append(rel)\n>       assert sorted(builders) == [\"compiler/compiler.py\"]\nE       AssertionError: assert ['audit/expor.../compiler.py'] == ['compiler/compiler.py']\nE         \nE         At index 0 diff: 'audit/export.py' != 'compiler/compiler.py'\nE         Left contains one more item: 'compiler/compiler.py'\nE         Use -v to get more diff\n\ntests\\test_compiler_authority.py:91: AssertionError"
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_style_smuggled_through_brief_rejected_with_ticket",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-P05",
+    "A56",
+    "B20",
+    "ADD27-9"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.009,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_pose_edit_without_identity_reference_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B21",
+    "A57",
+    "A59"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.007,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_stage_specific_operations_and_identity_bytes_sent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A55",
+    "A57",
+    "A59"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.028,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_reference_overflow_staged_or_blocked",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B22",
+    "ADD25-P06",
+    "A35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.117,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_prompt_length_and_dimension_limits",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.015,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_skill_md_only_has_no_authority",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B16",
+    "C13"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_compiler_bug_dropping_clause_is_caught_with_before_after_bytes",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A34",
+    "ADD27-8"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.009,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_unlike_subject_selects_different_branch_same_grammar",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C15",
+    "ADD26-P03",
+    "A51"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.014,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_deterministic_logical_request",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C16",
+    "A37"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.021,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_unpinned_or_modified_frozen_skill_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A33"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.051,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_compiler_authority.py::test_reference_impl_suites_pass",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A68"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.377,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_complete_fixture_ready_for_trial_with_honest_labels",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-1",
+    "ADD27-2"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_missing_face_viewpoint_rule_found_and_one_question_routed",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-3",
+    "ADD27-4"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_individually_supported_but_missing_face_view_light_link_rejected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-5"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_character_pose_contact_and_lighting_world_unlinked_rejected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-5"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_colour_present_but_world_light_link_missing_and_disconnected_world_camera",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-4"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_unexpected_phenomenon_becomes_dynamic_extension",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-10"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_all_eighteen_not_applicable_contradicts_scope",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-5"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_fixing_one_gap_uncovers_next_review_repeats",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-3"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_model_authored_clause_blocked_at_observation_to_skill_boundary",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-6",
+    "ADD27-11"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.058,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_declared_model_suggested_origin_never_freezable",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-6"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_skill_to_payload_authority_every_field_classified",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-7",
+    "ADD27-9"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.009,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_ungoverned_output_appearance_not_credited_to_skill",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-12"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_provenance_graph_lineage_and_dangling_parent_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-13"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_crash_during_completeness_commit_recovers_ledger_and_next_question",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-14"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.852,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_completeness_provenance.py::test_ledger_and_review_validate_against_addendum27_schema",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD27-1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.104,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_experiments_diagnosis.py::test_disabling_decision_changes_or_blocks_and_inert_rule_detected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A12",
+    "A11",
+    "C29"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.107,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_experiments_diagnosis.py::test_subchange_ablation_toggles_are_individually_addressable",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A13"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.13,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_experiments_diagnosis.py::test_ab_confound_detection",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A15"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_experiments_diagnosis.py::test_holdout_contamination_and_post_test_patch",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A17",
+    "C32",
+    "B32"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.078,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_experiments_diagnosis.py::test_rotating_brief_uses_same_skill_without_manual_rescue",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A16"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.008,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_experiments_diagnosis.py::test_multiple_simultaneous_root_causes_kept_separate",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A14",
+    "A46",
+    "C31",
+    "B31"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_experiments_diagnosis.py::test_visual_causality_requires_real_outputs_blocked_offline",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B33",
+    "A12"
+   ],
+   "phase": "PAID",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_frames_native.py::test_native_crop_real_pixel_coordinates",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A03",
+    "C04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.182,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_frames_native.py::test_resized_crop_labelled_native_rejected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F06",
+    "C04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.177,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_frames_native.py::test_real_films_indexed_but_zero_vlm_seen",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B03",
+    "C03",
+    "A27"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.002,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_rejected_art_blocks_everything_downstream",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A42",
+    "A67",
+    "C33",
+    "ADD26-I02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.008,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_agent_cannot_sign_and_fixture_signer_cannot_approve_real_run",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A42",
+    "C33"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.004,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_asset_approval_then_byte_change_invalidates",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A43",
+    "A44",
+    "B30",
+    "C33"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.032,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_art_replacement_after_approval_invalidates",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A44",
+    "B30"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.031,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_forged_or_tampered_approval_rejected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A42",
+    "C33"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.022,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_gate_and_approvals_survive_restart",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A47"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.041,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_scene_graph_validation",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A06"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_render_refused_before_approval_then_real_remotion_after",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A07",
+    "C25",
+    "C26",
+    "B34",
+    "A24"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 5.747,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_pan_only_video_not_counted_as_animation",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C26",
+    "B34",
+    "A25",
+    "C27",
+    "C28"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 5.2,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_review_page_and_feedback_persist",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A18",
+    "C36"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.544,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_status_claims_separate_and_truthful",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A23",
+    "A48",
+    "C37",
+    "ADD26-A02",
+    "ADD25-A02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.22,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gates_render.py::test_art_approved_but_asset_family_rejected_holds_before_video",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-I03",
+    "A43"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.015,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_unverified_7b_model_name_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B23",
+    "C17"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_real_adapter_refuses_without_network_authorization_cap",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A04",
+    "A05",
+    "B24",
+    "C34",
+    "C38"
+   ],
+   "phase": "PAID",
+   "duration_s": 0.074,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_source_frame_reference_requires_separate_upload_consent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C38",
+    "B24"
+   ],
+   "phase": "PAID",
+   "duration_s": 0.012,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_offline_output_is_decoded_real_raster_with_honest_cost",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C18",
+    "A20"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.071,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_provider_failures_never_reported_as_art[invalid_bytes-INVALID_IMAGE_BYTES]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A22",
+    "C18"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.044,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_provider_failures_never_reported_as_art[http_error-PROVIDER_EXECUTION]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A22",
+    "C18"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.045,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_provider_failures_never_reported_as_art[url_only-PROVIDER_URL_EXPIRED_OR_UNFETCHED]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A22",
+    "C18"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.053,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_provider_failures_never_reported_as_art[wrong_size-OUTPUT_DIMENSION_MISMATCH]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A22",
+    "C18"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.054,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_provider_failures_never_reported_as_art[no_image-PROVIDER_NO_IMAGE]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A22",
+    "C18"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.052,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_gateway_kill_after_send_reconciles_without_rebilling",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A19",
+    "A47",
+    "B06",
+    "ADD24-D4-2"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 1.586,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_gateway_unreconcilable_pending_is_unknown_billing",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A65",
+    "ADD26-R02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.044,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_synthetic_skill_never_reaches_real_provider",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C34"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.012,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_gateway.py::test_api_key_never_written",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C34"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.142,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_e2e_all_stages_real_consumers",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-A01",
+    "ADD26-S0S9",
+    "ADD24-E2",
+    "C13"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.006,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_s3_decision_is_what_the_skill_compiles",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q05",
+    "ADD24-E2"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.005,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_loop_without_human_stops_at_artwork_review",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-I02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 17.339,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_hard_kill_after_stage_then_resume_completes_without_redoing[S1]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-R01",
+    "ADD24-D4-3",
+    "ADD24-D4-4",
+    "C35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 17.806,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_hard_kill_after_stage_then_resume_completes_without_redoing[S2]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-R01",
+    "ADD24-D4-3",
+    "ADD24-D4-4",
+    "C35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 17.814,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_hard_kill_after_stage_then_resume_completes_without_redoing[S3]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-R01",
+    "ADD24-D4-3",
+    "ADD24-D4-4",
+    "C35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 17.477,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_hard_kill_after_stage_then_resume_completes_without_redoing[S4]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-R01",
+    "ADD24-D4-3",
+    "ADD24-D4-4",
+    "C35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 17.614,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_hard_kill_after_stage_then_resume_completes_without_redoing[S5]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-R01",
+    "ADD24-D4-3",
+    "ADD24-D4-4",
+    "C35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 17.379,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_export_import_handoff_new_workspace_reproduces_compile_and_next_op",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD24-D3",
+    "ADD24-D4-6",
+    "ADD25-R01",
+    "B08",
+    "ADD24-D1",
+    "ADD24-D2"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.97,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_import_refuses_corrupt_and_reports_missing_sources",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD24-D4-5",
+    "ADD25-R02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.687,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_review_rejection_survives_handoff",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD24-D4-7",
+    "A47"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.098,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_handoff_excludes_mp4_and_secrets",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-A01",
+    "B35"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.054,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_real_mode_loop_stops_truthfully_at_selection",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-S0S9"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.05,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_loop_handoff.py::test_kill_during_character_pose_generation_preserves_canonical_and_reconciles",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD24-D4-4",
+    "A47",
+    "A19"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 18.429,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_multi_gap_ranking_with_written_pairwise_reasons",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A08",
+    "C06"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.006,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_connected_cluster_first_iteration_character_world_view",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A09",
+    "B12",
+    "C30"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_question_derived_from_problem_not_literal_questionnaire",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q01",
+    "ADD25-Q01",
+    "B09",
+    "C08"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_question_list_theatre_refused",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_broken_compile_routes_to_compiler_repair_not_film_reanalysis",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q03"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_face_turn_condition_question_is_actor_view_specific",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q04",
+    "ADD26-P03"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_new_output_gap_yields_different_question",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q05",
+    "ADD26-I01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.008,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_vague_answer_keeps_decision_unresolved",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q06",
+    "C07",
+    "A10"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.005,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_sequential_questions_change_stage_as_handoffs_fill",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B13",
+    "ADD25-Q05",
+    "B31"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.015,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_questions.py::test_literal_q_stem_question_rejected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-Q01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_schemas.py::test_compile_gateway_records_validate_02_and_21",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C36",
+    "B36",
+    "A06"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.074,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_schemas.py::test_decision_character_question_records_validate",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C36"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.004,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_schemas.py::test_gate_approval_review_checkpoint_records_validate",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C36",
+    "A47"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 1.902,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_schemas.py::test_real_frame_coverage_ledger_validates_02",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A26",
+    "C36"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.004,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_four_films_blocks_selection",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-S01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_three_per_film_dedupe_substitution_expansion_and_evidence",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-S02",
+    "ADD25-S03",
+    "ADD25-S04",
+    "ADD25-S05",
+    "ADD24-E1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_real_survey_navigation_windows_cannot_be_selected_without_rationale",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-S05"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_sixth_absent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-D02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_sixth_located_from_actual_frames_nonround_pts",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-D03"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 13.422,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_multiple_volcano_or_logo_events_not_auto_locked",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-D04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 8.599,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_real_sixth_locator_local_candidates_awaiting_human",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-D03",
+    "ADD26-D04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_selection_sixth.py::test_only_authoritative_spec_set_used",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-D01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.019,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_fresh_repo_no_prior_animationlab_and_forbidden_roots",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A01",
+    "B01",
+    "C01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.192,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_synthetic_clip_decode_index_pts",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A02",
+    "B02",
+    "C02",
+    "A26"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_vfr_timestamps_preserved_not_collapsed",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A26",
+    "A29"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.304,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_false_100pct_claim_rejected",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A29",
+    "B03",
+    "ADD25-F01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_index_analysis_flags_duplicate_pts_and_tail_gap",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A29"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_source_lock_rebind_refuses_changed_bytes",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-R02",
+    "C01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.01,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_real_sources_indexed_every_frame_locally",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A02",
+    "A26",
+    "A66",
+    "C02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 1.291,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_sources.py::test_real_frame_retrieval_identity_spot_check",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A03",
+    "C04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.859,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_source_specific_facts_demoted_to_scene_fact",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A49",
+    "A30",
+    "B10",
+    "C09",
+    "ADD25-Q03",
+    "ADD26-S01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_brand_logo_never_a_transferable_rule",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-D05"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_adjective_only_decision_is_vague",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A50",
+    "C07",
+    "B09"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_conditions_exceptions_adaptations_required",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A51",
+    "A31",
+    "C10",
+    "B14"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_no_registered_operation_stays_research_only",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B15",
+    "ADD25-Q04",
+    "ADD26-S02",
+    "C12"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_single_source_example_stays_conditional_candidate",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "B11",
+    "ADD25-Q02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_substitution_challenge_requires_two_unlike_subjects",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A52",
+    "C11"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_native_crop_without_full_frame_context_invalid",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-F03"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_camera_vs_redraw_ambiguity_blocks_motion_skill",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD26-F04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_style_decisions.py::test_originality_requires_real_distinct_outputs_blocked_offline",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A32"
+   ],
+   "phase": "ART",
+   "duration_s": 0.016,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_plan_exact_targets_and_provider_image_limit",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F01",
+    "ADD25-F07",
+    "A61"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_full_mock_pass_commits_every_frame_but_never_real_vlm",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A27",
+    "A61",
+    "A62",
+    "C03",
+    "B03"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 2.732,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_mock_provider_on_real_source_forbidden",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C03",
+    "ADD26-F01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.001,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_bad_vlm_responses_never_advance_coverage[omit_one-NEEDS_REINSPECTION-ADD25-F03]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F03",
+    "A62",
+    "A61",
+    "B04",
+    "B05",
+    "ADD25-F07",
+    "ADD26-F02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.03,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_bad_vlm_responses_never_advance_coverage[summary_only-NEEDS_REINSPECTION-A62]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F03",
+    "A62",
+    "A61",
+    "B04",
+    "B05",
+    "ADD25-F07",
+    "ADD26-F02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.018,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_bad_vlm_responses_never_advance_coverage[subsample-NEEDS_REINSPECTION-A61]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F03",
+    "A62",
+    "A61",
+    "B04",
+    "B05",
+    "ADD25-F07",
+    "ADD26-F02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.03,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_bad_vlm_responses_never_advance_coverage[hash_mismatch-QUARANTINED-B05]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F03",
+    "A62",
+    "A61",
+    "B04",
+    "B05",
+    "ADD25-F07",
+    "ADD26-F02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.017,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_bad_vlm_responses_never_advance_coverage[received_fewer-NEEDS_REINSPECTION-ADD25-F07]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F03",
+    "A62",
+    "A61",
+    "B04",
+    "B05",
+    "ADD25-F07",
+    "ADD26-F02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.018,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_bad_vlm_responses_never_advance_coverage[corrupt_json-NEEDS_REINSPECTION-C35]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F03",
+    "A62",
+    "A61",
+    "B04",
+    "B05",
+    "ADD25-F07",
+    "ADD26-F02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.017,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_vague_entries_flagged_weak_not_artistic",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F05"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.031,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_boundary_event_must_be_reconciled",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A63",
+    "C05"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.064,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_hard_kill_at_every_boundary_then_resume_new_process[after_inputs_ready]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A19",
+    "A64",
+    "A65",
+    "B06",
+    "B07",
+    "C35",
+    "ADD25-F08",
+    "ADD24-D4-1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 7.162,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_hard_kill_at_every_boundary_then_resume_new_process[after_inflight_commit]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A19",
+    "A64",
+    "A65",
+    "B06",
+    "B07",
+    "C35",
+    "ADD25-F08",
+    "ADD24-D4-1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 7.306,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_hard_kill_at_every_boundary_then_resume_new_process[after_submit_before_save]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A19",
+    "A64",
+    "A65",
+    "B06",
+    "B07",
+    "C35",
+    "ADD25-F08",
+    "ADD24-D4-1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 7.194,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_hard_kill_at_every_boundary_then_resume_new_process[after_raw_response]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A19",
+    "A64",
+    "A65",
+    "B06",
+    "B07",
+    "C35",
+    "ADD25-F08",
+    "ADD24-D4-1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 7.277,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_hard_kill_at_every_boundary_then_resume_new_process[mid_semantic_commit]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A19",
+    "A64",
+    "A65",
+    "B06",
+    "B07",
+    "C35",
+    "ADD25-F08",
+    "ADD24-D4-1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 7.262,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_hard_kill_at_every_boundary_then_resume_new_process[after_semantic_commit]",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A19",
+    "A64",
+    "A65",
+    "B06",
+    "B07",
+    "C35",
+    "ADD25-F08",
+    "ADD24-D4-1"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 6.848,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_unqueryable_pending_task_is_unknown_billing_not_resubmitted",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A65",
+    "B06",
+    "ADD26-R02"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.022,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_semantic_checkpoint_records_questions_boundary_and_next",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A64",
+    "B08",
+    "ADD25-R01"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.046,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_committed_artifact_tamper_quarantined_on_verify",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "C35",
+    "A64"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.045,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_all_frame_vlm_estimate_blocks_without_verified_price",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A28",
+    "A05"
+   ],
+   "phase": "PAID",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_real_vision_adapter_refuses_without_network_consent",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A28",
+    "C38",
+    "B24"
+   ],
+   "phase": "PAID",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_two_film_first_vs_five_reporting",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "A66"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.0,
+   "longrepr": null
+  },
+  {
+   "nodeid": "tests/test_vision_ledger.py::test_duplicate_frame_identity_distinct_presentation_indices",
+   "outcome": "passed",
+   "when": "call",
+   "req_ids": [
+    "ADD25-F04"
+   ],
+   "phase": "OFFLINE",
+   "duration_s": 0.311,
+   "longrepr": null
+  }
+ ]
+}

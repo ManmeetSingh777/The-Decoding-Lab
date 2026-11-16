@@ -1,0 +1,10 @@
+{
+  "created_at": "2026-11-14T21:57:42+00:00",
+  "current_stage": "S0",
+  "last_completed_unit": "REAL-001:S0:STOPPED",
+  "paid_vlm_frames_seen": 0,
+  "run_mode": "OFFLINE_BUILD",
+  "runware_real_calls": 0,
+  "schema": "vme.state/1",
+  "updated_at": "2026-11-15T00:52:46+00:00"
+}

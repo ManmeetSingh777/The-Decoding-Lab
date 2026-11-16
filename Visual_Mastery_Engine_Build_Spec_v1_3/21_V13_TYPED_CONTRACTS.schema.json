@@ -1,0 +1,951 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Structural typing only; never artistic mastery evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_type",
+    "data"
+  ],
+  "properties": {
+    "contract_type": {
+      "enum": [
+        "FrameWitness",
+        "QuestionTrace",
+        "StyleDecision",
+        "OperationNode",
+        "SkillClause",
+        "CharacterPlan",
+        "RasterAsset",
+        "SemanticCheckpoint",
+        "PromptTrace",
+        "AuditRow"
+      ]
+    },
+    "data": {}
+  },
+  "$defs": {
+    "FrameWitness": {
+      "type": "object",
+      "required": [
+        "film_sha256",
+        "frame_index",
+        "pts",
+        "visible_relation",
+        "scene_specific_facts",
+        "native_regions",
+        "limits"
+      ],
+      "properties": {
+        "film_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "frame_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pts": {
+          "type": "number",
+          "minimum": 0
+        },
+        "visible_relation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scene_specific_facts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "native_regions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y",
+              "w",
+              "h"
+            ],
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "w": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "h": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "limits": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "QuestionTrace": {
+      "type": "object",
+      "required": [
+        "id",
+        "cluster_id",
+        "visible_target",
+        "production_unknown",
+        "witness_ids",
+        "evidence_needed",
+        "answer_status",
+        "answer",
+        "next_ids",
+        "operator_affected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cluster_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visible_target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "production_unknown": {
+          "type": "string",
+          "minLength": 1
+        },
+        "witness_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_needed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "answer_status": {
+          "enum": [
+            "OBSERVED",
+            "INFERRED",
+            "UNKNOWN",
+            "REFUTED"
+          ]
+        },
+        "answer": {
+          "type": "string"
+        },
+        "next_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "operator_affected": {
+          "type": "string"
+        },
+        "counterevidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "StyleDecision": {
+      "type": "object",
+      "required": [
+        "id",
+        "evidence_ids",
+        "visible_effect",
+        "conditions",
+        "construction_action",
+        "invariants",
+        "adaptations",
+        "exceptions",
+        "free_content",
+        "dependencies",
+        "operation_ids",
+        "predicted_pixels_change",
+        "source_specific_excluded",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "visible_effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "construction_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invariants": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "adaptations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "free_content": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "operation_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "predicted_pixels_change": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_specific_excluded": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "status": {
+          "enum": [
+            "CANDIDATE",
+            "SUPPORTED",
+            "REFUTED",
+            "UNKNOWN"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "OperationNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "decisions",
+        "inputs",
+        "required_capabilities",
+        "outputs",
+        "depends_on"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "whole_scene",
+            "canonical_character",
+            "guided_pose_edit",
+            "region_edit",
+            "layer_extract",
+            "clean_plate",
+            "composite",
+            "motion_render"
+          ]
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fallback": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SkillClause": {
+      "type": "object",
+      "required": [
+        "id",
+        "decision_id",
+        "priority",
+        "template",
+        "allowed_content_slots",
+        "reference_roles",
+        "operation_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "template": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_content_slots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reference_roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "CharacterPlan": {
+      "type": "object",
+      "required": [
+        "character_id",
+        "style_version",
+        "canonical_art_id",
+        "whole_design_decisions",
+        "required_pose_states",
+        "hand_prop_interactions"
+      ],
+      "properties": {
+        "character_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "style_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_art_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "whole_design_decisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required_pose_states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "view",
+              "pose",
+              "expression",
+              "full_art_asset"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "view": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pose": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expression": {
+                "type": "string",
+                "minLength": 1
+              },
+              "full_art_asset": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "hand_prop_interactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "hand",
+              "prop",
+              "visible_side",
+              "state_id"
+            ],
+            "properties": {
+              "hand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prop": {
+                "type": "string",
+                "minLength": 1
+              },
+              "visible_side": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RasterAsset": {
+      "type": "object",
+      "required": [
+        "id",
+        "sha256",
+        "width",
+        "height",
+        "pixel_mode",
+        "has_nonopaque_alpha",
+        "coordinate_space",
+        "origin_x",
+        "origin_y",
+        "owner",
+        "skill_version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pixel_mode": {
+          "enum": [
+            "RGB",
+            "RGBA",
+            "MASK_L",
+            "OTHER"
+          ]
+        },
+        "has_nonopaque_alpha": {
+          "type": "boolean"
+        },
+        "coordinate_space": {
+          "enum": [
+            "scene",
+            "world",
+            "character_local",
+            "prop_local"
+          ]
+        },
+        "origin_x": {
+          "type": "number"
+        },
+        "origin_y": {
+          "type": "number"
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skill_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mask_asset": {
+          "type": "string"
+        },
+        "source_composite_asset": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SemanticCheckpoint": {
+      "type": "object",
+      "required": [
+        "film_sha256",
+        "committed_packet_id",
+        "next_frame",
+        "active_scene",
+        "objects",
+        "actions",
+        "active_questions",
+        "unresolved_theories",
+        "current_skill_versions",
+        "provider_request_state"
+      ],
+      "properties": {
+        "film_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "committed_packet_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "active_scene": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "active_questions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unresolved_theories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "current_skill_versions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "provider_request_state": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PromptTrace": {
+      "type": "object",
+      "required": [
+        "brief_hash",
+        "skill_hash",
+        "decision_ids",
+        "clause_ids",
+        "reference_sha256s",
+        "model_air_id",
+        "operation_graph_sha",
+        "provider_payload_sha",
+        "authority"
+      ],
+      "properties": {
+        "brief_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "skill_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decision_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "clause_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reference_sha256s": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "model_air_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation_graph_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "provider_payload_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "authority": {
+          "type": "object",
+          "required": [
+            "style",
+            "content",
+            "identity",
+            "technical"
+          ],
+          "properties": {
+            "style": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
+            },
+            "identity": {
+              "type": "string",
+              "minLength": 1
+            },
+            "technical": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "AuditRow": {
+      "type": "object",
+      "required": [
+        "id",
+        "module",
+        "entrypoint",
+        "test_command",
+        "result",
+        "evidence",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module": {
+          "type": "string"
+        },
+        "entrypoint": {
+          "type": "string"
+        },
+        "test_command": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "BLOCKED",
+            "NOT_BUILT"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "SHA": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "FrameWitness"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FrameWitness"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "QuestionTrace"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/QuestionTrace"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "StyleDecision"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/StyleDecision"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "OperationNode"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/OperationNode"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "SkillClause"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/SkillClause"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "CharacterPlan"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/CharacterPlan"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "RasterAsset"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/RasterAsset"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "SemanticCheckpoint"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/SemanticCheckpoint"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "PromptTrace"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/PromptTrace"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_type": {
+            "const": "AuditRow"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/AuditRow"
+          }
+        }
+      }
+    }
+  ]
+}
